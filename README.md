@@ -35,7 +35,7 @@ The **Guardian Node** is a plug-and-play, offline AI assistant designed to deliv
 
 ## 🖼 Prototype Concept
 
-![Touchscreen Guardian Node](https://github.com/BBO513/guardian-node/assets/main/device_render_touch.png)
+![Touchscreen Guardian Node]https://github.com/BBO513/guardian-node/blob/main/image_offline_ai.png
 
 ---
 
