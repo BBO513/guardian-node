@@ -24,6 +24,21 @@ The **Guardian Node** is a plug-and-play, offline AI assistant designed to deliv
 
 ---
 
+## Local AI Settings
+
+Guardian Node uses a local GGUF model for offline AI capabilities. The default model is **Phi-3-mini-4k-instruct-q4.gguf**, provided locally at `guardian_interpreter/models/`.
+
+To use:
+- **Copy your existing `Phi-3-mini-4k-instruct-q4.gguf` to `guardian_interpreter/models/`**
+  (e.g., from `C:\Users\works\Desktop\Offline AI Cyber Sec\guardian_interpreter_v1.0.0\guardian_interpreter\models` via USB or with WSL: `cp /mnt/c/...`).
+- **Ensure `llama-cpp-python` is installed** (see `requirements.txt`, install offline with wheel if needed).
+- **No internet required;** the model stays local and never leaves your device.
+
+---
+
+
+---
+
 ## 📦 Hardware Vision
 
 - Fanless mini-PC case with matte black finish
