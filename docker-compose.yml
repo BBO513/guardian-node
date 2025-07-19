@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  guardian:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./guardian_interpreter:/app/guardian_interpreter
+      - ./assets:/app/assets
+    ports:
+      - "8080:8080"  # MCP server
+    environment:
+      - GUARDIAN_OFFLINE=true
+      - GUARDIAN_PRIVACY_MODE=strict
+      - GUARDIAN_FAMILY_MODE=true
+    privileged: true  # For network access on Pi5 (adjust per security needs)
+    restart: unless-stopped
+    networks:
+      - guardian-net
+networks:
+  guardian-net:
+    driver: bridge
