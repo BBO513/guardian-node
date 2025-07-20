@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  guardian-node:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: guardian-node-family
+    hostname: guardian-node
+    ports:
+      - "8080:8080"   # Main web interface
+      - "8443:8443"   # Secure web interface (if enabled)
+    environment:
+      - TZ=UTC
+      - GUARDIAN_MODE=family
+      - GUARDIAN_OFFLINE=true
+      - GUARDIAN_GUI_ENABLED=true
+      - GUARDIAN_FAMILY_MODE=true
+      - PYTHONPATH=/app
+    volumes:
+      # Persistent data storage
+      - guardian_data:/data
+      - guardian_logs:/logs
+      - guardian_models:/app/models
+      - guardian_config:/app/config
+      # Optional: Mount local config for development
+      # - ./guardian_interpreter/config.yaml:/app/guardian_interpreter/config.yaml:ro
+    restart: unless-stopped
+    
+    # Resource limits optimized for Raspberry Pi 5 (16GB RAM)
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'      # Use up to 3 CPU cores
+          memory: 12G      # Use up to 12GB RAM (leave 4GB for system)
+        reservations:
+          cpus: '0.5'      # Reserve at least 0.5 CPU
+          memory: 2G       # Reserve at least 2GB RAM
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "python", "/app/health_check.py"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s   # Allow 2 minutes for startup
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Set to true for extra security, but may need adjustments
+    
+    # Network configuration
+    networks:
+      - guardian_network
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Optional: Add a lightweight web dashboard
+  guardian-dashboard:
+    image: nginx:alpine
+    container_name: guardian-dashboard
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/dashboard:/usr/share/nginx/html:ro
+    depends_on:
+      - guardian-node
+    networks:
+      - guardian_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+
+# Named volumes for persistent storage
+volumes:
+  guardian_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  guardian_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
+  guardian_models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./models
+  guardian_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./config
+
+# Custom network for Guardian services
+networks:
+  guardian_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet:  172.31.77.0/24

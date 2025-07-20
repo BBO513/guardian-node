@@ -407,7 +407,125 @@ Keep the response helpful, encouraging, and actionable for a family audience.
             except Exception as e:
                 print(f"Error: {e}")
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+def main():
+    """Main entry point with argument parsing"""
+    import argparse
+    
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Guardian Node - Family Cybersecurity Assistant')
+    parser.add_argument('--gui', action='store_true', help='Launch GUI mode')
+    parser.add_argument('--mcp', action='store_true', help='Enable MCP server')
+    parser.add_argument('--family-mode', action='store_true', help='Enable family assistant mode')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    
+    args = parser.parse_args()
+    
+    # Set up logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Create Guardian CLI instance
     cli = GuardianCLI()
+    
+    # Launch GUI if requested
+    if args.gui:
+        try:
+            from guardian_gui import create_guardian_gui
+            print("🖥️ Launching Guardian Node GUI...")
+            
+            # Create GUI application
+            app, window = create_guardian_gui(cli)
+            
+            # Set environment variables for GUI mode
+            import os
+            if args.family_mode:
+                os.environ['GUARDIAN_FAMILY_MODE'] = 'true'
+            if args.mcp:
+                os.environ['GUARDIAN_MCP_ENABLED'] = 'true'
+            
+            print("✓ GUI launched successfully")
+            print("   Use the mode buttons to switch between Adult/Teen/Kids modes")
+            print("   Click buttons to access family features and security tools")
+            
+            # Run GUI event loop
+            sys.exit(app.exec())
+            
+        except ImportError as e:
+            print(f"❌ GUI dependencies not available: {e}")
+            print("Install GUI dependencies: pip install PySide6")
+            print("Falling back to CLI mode...")
+            cli.family_cli_loop()
+        except Exception as e:
+            print(f"❌ Error launching GUI: {e}")
+            print("Falling back to CLI mode...")
+            cli.family_cli_loop()
+    else:
+        # Run CLI mode
+        print("🖥️ Starting Guardian Node CLI...")
+        if args.family_mode:
+            print("👨‍👩‍👧‍👦 Family assistant mode enabled")
+        if args.mcp:
+            print("🔌 MCP server mode enabled")
+        
+        cli.family_cli_loop()
+
+def main():
+    """Main entry point with argument parsing"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Guardian Node - Family Cybersecurity Assistant")
+    parser.add_argument('--gui', action='store_true', help='Launch GUI mode')
+    parser.add_argument('--mcp', action='store_true', help='Enable MCP server')
+    parser.add_argument('--family-mode', action='store_true', help='Enable family mode')
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    
+    print("🛡️ Starting Guardian Node...")
+    
+    if args.gui:
+        print("🖥️ Launching GUI mode...")
+        try:
+            from guardian_gui import create_guardian_gui
+            
+            # Create Guardian CLI instance for backend integration
+            guardian = GuardianCLI()
+            
+            # Set Raspberry Pi environment if on ARM
+            import platform
+            if platform.machine() in ['aarch64', 'armv7l']:
+                os.environ['RASPBERRY_PI'] = '1'
+            else:
+                os.environ['RASPBERRY_PI'] = '0'
+            
+            # Create and run GUI
+            app, window = create_guardian_gui(guardian)
+            print("✅ GUI launched successfully")
+            sys.exit(app.exec())
+            
+        except ImportError as e:
+            print(f"❌ GUI not available: {e}")
+            print("💡 Install PySide6: pip install PySide6")
+            print("🔄 Falling back to CLI mode...")
+            
+    # CLI mode (default)
+    print("💻 Running in CLI mode...")
+    cli = GuardianCLI()
+    
+    if args.mcp:
+        print("🔌 MCP server mode enabled")
+        # MCP integration would go here
+    
+    if args.family_mode:
+        print("👨‍👩‍👧‍👦 Family mode enabled")
+    
     cli.family_cli_loop()
+
+
+if __name__ == "__main__":
+    main()

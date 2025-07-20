@@ -132,11 +132,10 @@ def test_with_mock_llm():
     print("-" * 30)
     
     try:
-        import llm_integration
         config = {'llm': {'model_path': 'mock'}}
         logger = logging.getLogger('test')
         
-        llm = llm_integration.create_llm(config, logger)
+        llm = create_llm(config, logger)
         llm.load_model()
         
         # Test standard response
@@ -144,12 +143,11 @@ def test_with_mock_llm():
         print(f"Standard response: {response[:100]}...")
         
         # Test family response
-        import family_llm_prompts
         family_response = llm.generate_family_response(
             "How do I teach my child about online safety?",
-            context=family_llm_prompts.FamilyContext.CHILD_EDUCATION,
+            context=FamilyContext.CHILD_EDUCATION,
             child_safe_mode=True,
-            safety_level=family_llm_prompts.ChildSafetyLevel.MODERATE
+            safety_level=ChildSafetyLevel.MODERATE
         )
         print(f"Family response: {family_response[:100]}...")
         

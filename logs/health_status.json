@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-07-17T04:48:03.508215",
+  "status": "degraded",
+  "checks": {
+    "processes": {
+      "status": "pass",
+      "running_processes": 1,
+      "details": [
+        {
+          "pid": 1,
+          "name": "entrypoint.sh",
+          "cmdline": "/bin/bash /app/docker/entrypoint.sh python /app/guardian_interpreter/main.py"
+        }
+      ]
+    },
+    "filesystem": {
+      "status": "pass",
+      "missing_paths": []
+    },
+    "resources": {
+      "status": "pass",
+      "memory_ok": true,
+      "memory_available_mb": 13749,
+      "disk_ok": true,
+      "disk_free_gb": 113,
+      "cpu_ok": true,
+      "cpu_percent": 19.4
+    },
+    "network": {
+      "status": "warn",
+      "local_port_8080": false
+    },
+    "configuration": {
+      "status": "pass",
+      "valid_configs": [
+        "/data/config.yaml",
+        "/app/guardian_interpreter/config.yaml"
+      ]
+    },
+    "family_assistant": {
+      "status": "pass",
+      "available_components": [
+        "/app/guardian_interpreter/skills",
+        "/data/families"
+      ]
+    }
+  }
+}

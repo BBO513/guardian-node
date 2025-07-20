@@ -12,6 +12,15 @@ llama-cpp-python>=0.2.0
 # Optional: For enhanced functionality
 ipaddress>=1.0.23
 
+# Family Assistant dependencies
+cryptography>=41.0.0
+
+# Voice interface dependencies (optional)
+speechrecognition>=3.10.0
+pyttsx3>=2.90
+pyaudio>=0.2.11
+sounddevice>=0.4.6
+
 # Development dependencies (optional)
 # pytest>=7.0.0
 # black>=22.0.0

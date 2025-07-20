@@ -2,14 +2,9 @@
 
 ## Introduction
 
-The Guardian Node Cybersecurity Assistant is a user-friendly AI feature designed to help users and non-technical household/small business members understand and improve their digital security. This assistant provides personalized cybersecurity guidance, threat explanations, and actionable recommendations in simple, accessible language. The Guardian Node operates completely offline¹ to ensure privacy and builds trust with users concerned about their digital safety.
+The Guardian Node Cybersecurity Assistant is a user-friendly AI feature designed to help users and non-technical household/small business members understand and improve their digital security. This assistant provides personalized cybersecurity guidance, threat explanations, and actionable recommendations in simple, accessible language. The Guardian Node operates completely offline to ensure privacy and builds trust with users concerned about their digital safety.
 
----
-**Technical Footnotes:**
-1. **Offline Operation**: Utilizes local GGUF models² via llama-cpp-python with airgap capability³ and hard-blocked internet by default
-2. **Modular LLM Support**: Compatible with SecureBERT, Mistral 7B, Dolphin, and other GGUF-format models with configurable context length and temperature
-3. **Airgap Logic**: Physical network cutoff capability with comprehensive network request blocking and audit logging
-4. **Skills Architecture**: Built on Guardian Interpreter's modular skill system where each cybersecurity function is a loadable Python module with standardized run() entry points 
+The system leverages local GGUF models via llama-cpp-python with airgap capability and hard-blocked internet by default. It supports modular LLM compatibility with SecureBERT, Mistral 7B, Dolphin, and other GGUF-format models. The architecture is built on Guardian Interpreter's modular skill system where each cybersecurity function is a loadable Python module with standardized run() entry points. 
 
 ## Requirements
 
@@ -59,7 +54,7 @@ The Guardian Node Cybersecurity Assistant is a user-friendly AI feature designed
 
 ### Requirement 5
 
-**User Story:** As a privacy-conscious user, I want all interactions with the cybersecurity assistant to remain completely private and offline⁴, so that my household/small business security discussions never leave our local network.
+**User Story:** As a privacy-conscious user, I want all interactions with the cybersecurity assistant to remain completely private and offline, so that my household/small business security discussions never leave our local network.
 
 #### Acceptance Criteria
 

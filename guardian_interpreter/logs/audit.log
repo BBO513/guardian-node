@@ -3,3 +3,148 @@
 2025-07-12 12:35:57,172 - AUDIT - INFO - [SKILL] Executed skill: example_skill - Details: {'skill': 'example_skill', 'arguments': ['test', 'argument'], 'result_length': 53}
 2025-07-12 12:36:03,197 - AUDIT - INFO - [LLM] AI interaction - Details: {'prompt_length': 29, 'response_length': 0}
 2025-07-12 12:36:03,197 - AUDIT - INFO - [LLM] AI interaction - Details: {'prompt_length': 29, 'response_length': 110}
+2025-07-17 09:21:44,750 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,751 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_001', 'activity_type': 'query'}
+2025-07-17 09:21:44,756 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,756 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,757 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_006', 'activity_type': 'query'}
+2025-07-17 09:21:44,757 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_006', 'activity_type': 'query'}
+2025-07-17 09:21:44,757 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_006', 'activity_type': 'query'}
+2025-07-17 09:21:44,757 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_006', 'activity_type': 'query'}
+2025-07-17 09:21:44,758 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'test_family_006', 'activity_type': 'recommendation'}
+2025-07-17 09:21:44,758 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'test_family_006', 'activity_type': 'recommendation'}
+2025-07-17 09:21:44,758 - AUDIT - INFO - [SECURITY] Family security event: threat_detected - Details: {'family_id': 'test_family_006', 'event_type': 'threat_detected'}
+2025-07-17 09:21:44,758 - AUDIT - INFO - [SECURITY] Family security event: threat_detected - Details: {'family_id': 'test_family_006', 'event_type': 'threat_detected'}
+2025-07-17 09:21:44,763 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,763 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,763 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,765 - AUDIT - INFO - [SECURITY] Family security event: suspicious_activity_detected - Details: {'family_id': 'test_family_002', 'event_type': 'suspicious_activity_detected'}
+2025-07-17 09:21:44,765 - AUDIT - INFO - [SECURITY] Family security event: suspicious_activity_detected - Details: {'family_id': 'test_family_002', 'event_type': 'suspicious_activity_detected'}
+2025-07-17 09:21:44,765 - AUDIT - INFO - [SECURITY] Family security event: suspicious_activity_detected - Details: {'family_id': 'test_family_002', 'event_type': 'suspicious_activity_detected'}
+2025-07-17 09:21:44,769 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,769 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,769 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,769 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_004', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_004', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_004', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_004', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_005', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_005', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_005', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_005', 'activity_type': 'query'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'test_family_004', 'activity_type': 'recommendation'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'test_family_004', 'activity_type': 'recommendation'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'test_family_004', 'activity_type': 'recommendation'}
+2025-07-17 09:21:44,770 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'test_family_004', 'activity_type': 'recommendation'}
+2025-07-17 09:21:44,774 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,774 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,774 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,774 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,774 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,775 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,775 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,775 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,775 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,775 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,776 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,777 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,777 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,777 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,777 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,777 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,778 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_009', 'activity_type': 'query'}
+2025-07-17 09:21:44,783 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,783 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,783 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,783 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,783 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,783 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,784 - AUDIT - INFO - [FAMILY] Family activity: device_registration - Details: {'family_id': 'test_family_007', 'activity_type': 'device_registration'}
+2025-07-17 09:21:44,784 - AUDIT - INFO - [FAMILY] Family activity: device_registration - Details: {'family_id': 'test_family_007', 'activity_type': 'device_registration'}
+2025-07-17 09:21:44,784 - AUDIT - INFO - [FAMILY] Family activity: device_registration - Details: {'family_id': 'test_family_007', 'activity_type': 'device_registration'}
+2025-07-17 09:21:44,784 - AUDIT - INFO - [FAMILY] Family activity: device_registration - Details: {'family_id': 'test_family_007', 'activity_type': 'device_registration'}
+2025-07-17 09:21:44,784 - AUDIT - INFO - [FAMILY] Family activity: device_registration - Details: {'family_id': 'test_family_007', 'activity_type': 'device_registration'}
+2025-07-17 09:21:44,784 - AUDIT - INFO - [FAMILY] Family activity: device_registration - Details: {'family_id': 'test_family_007', 'activity_type': 'device_registration'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,789 - AUDIT - INFO - [FAMILY] Family activity: profile_update - Details: {'family_id': 'test_family_003', 'activity_type': 'profile_update'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:21:44,793 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'test_family_008', 'activity_type': 'query'}
+2025-07-17 09:23:20,103 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:23:20,104 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'smith_family_001', 'activity_type': 'query'}
+2025-07-17 09:23:20,104 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'smith_family_001', 'activity_type': 'recommendation'}
+2025-07-17 09:23:20,105 - AUDIT - INFO - [FAMILY] Family activity: skill_execution - Details: {'family_id': 'johnson_family_002', 'activity_type': 'skill_execution'}
+2025-07-17 09:23:20,105 - AUDIT - INFO - [SECURITY] Family security event: threat_detected - Details: {'family_id': 'smith_family_001', 'event_type': 'threat_detected'}
+2025-07-17 09:23:20,107 - AUDIT - INFO - [SECURITY] Family security event: parental_control_violation - Details: {'family_id': 'johnson_family_002', 'event_type': 'parental_control_violation'}
+2025-07-17 09:23:20,107 - AUDIT - INFO - [FAMILY] Family activity: profile_setup - Details: {'family_id': 'demo_family_003', 'activity_type': 'profile_setup'}
+2025-07-17 09:24:14,493 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-17 09:24:14,493 - AUDIT - INFO - [FAMILY] Family activity: query - Details: {'family_id': 'smith_family_001', 'activity_type': 'query'}
+2025-07-17 09:24:14,494 - AUDIT - INFO - [FAMILY] Family activity: recommendation - Details: {'family_id': 'smith_family_001', 'activity_type': 'recommendation'}
+2025-07-17 09:24:14,494 - AUDIT - INFO - [FAMILY] Family activity: skill_execution - Details: {'family_id': 'johnson_family_002', 'activity_type': 'skill_execution'}
+2025-07-17 09:24:14,495 - AUDIT - INFO - [SECURITY] Family security event: threat_detected - Details: {'family_id': 'smith_family_001', 'event_type': 'threat_detected'}
+2025-07-17 09:24:14,495 - AUDIT - INFO - [SECURITY] Family security event: parental_control_violation - Details: {'family_id': 'johnson_family_002', 'event_type': 'parental_control_violation'}
+2025-07-17 09:24:14,496 - AUDIT - INFO - [FAMILY] Family activity: profile_setup - Details: {'family_id': 'demo_family_003', 'activity_type': 'profile_setup'}
