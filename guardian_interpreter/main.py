@@ -181,14 +181,22 @@ Examples:
             print("Family assistant not available.")
             return
         try:
-            result = self.family_manager.run_family_skill(skill_name, *args)
-            if result.get('success'):
+            # Check if family mode is enabled
+            if hasattr(self, 'config') and self.config.get('family_mode', False):
+                # Use enhanced family skill execution
+                result = self.family_manager.execute_skill(skill_name, *args)
                 print(f"✓ Family skill '{skill_name}' completed")
-                skill_result = result.get('result')
-                if skill_result:
-                    print(f"Result: {skill_result}")
+                print(f"Result: {result}")
             else:
-                print(f"✗ Family skill '{skill_name}' failed: {result.get('error', 'Unknown error')}")
+                # Use standard family skill execution
+                result = self.family_manager.run_family_skill(skill_name, *args)
+                if result.get('success'):
+                    print(f"✓ Family skill '{skill_name}' completed")
+                    skill_result = result.get('result')
+                    if skill_result:
+                        print(f"Result: {skill_result}")
+                else:
+                    print(f"✗ Family skill '{skill_name}' failed: {result.get('error', 'Unknown error')}")
         except Exception as e:
             print(f"✗ Error running family skill '{skill_name}': {e}")
             self.logger.error(f"Family skill execution error: {e}")

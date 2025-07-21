@@ -4,11 +4,52 @@
 
 # LLM Configuration
 llm:
-  model_path: "models/your-model.gguf"  # Path to your GGUF model file
+  # Docker Model Runner (preferred for production)
+  docker_runner:
+    enabled: true
+    api_url: "http://localhost:8080"  # Docker Model Runner API endpoint
+    model_name: "guardian-node-llm:v1"  # Model name in Docker registry
+    
+  # Multiple GGUF Models Configuration (direct loading fallback)
+  models:
+    default:
+      path: "models/phi-3-mini-4k-instruct-q4.gguf"
+      context_length: 4096
+      temperature: 0.7
+      max_tokens: 512
+      threads: 4
+      age_groups: ["adult", "teen", "child"]
+      contexts: ["general", "security", "education", "threat_analysis"]
+      description: "General purpose family cybersecurity model"
+      
+    child_safe:
+      path: "models/phi-3-mini-child-safe-q4.gguf"  # Optional specialized model
+      context_length: 2048
+      temperature: 0.5  # Lower temperature for more consistent child-safe responses
+      max_tokens: 256
+      threads: 2
+      age_groups: ["child"]
+      contexts: ["education", "child_safety"]
+      description: "Child-safe educational model with strict content filtering"
+      
+    security_expert:
+      path: "models/llama-3.2-3b-security-q4.gguf"  # Optional security-focused model
+      context_length: 8192
+      temperature: 0.3  # Lower temperature for more precise security analysis
+      max_tokens: 1024
+      threads: 4
+      age_groups: ["adult"]
+      contexts: ["security", "threat_analysis", "device_guidance"]
+      description: "Security-focused model for detailed threat analysis"
+  
+  # Legacy single model path (for backward compatibility)
+  model_path: "models/your-model.gguf"
+  
+  # Common LLM settings (used as defaults)
   context_length: 4096
   temperature: 0.7
   max_tokens: 512
-  threads: 4  # CPU threads for inference
+  threads: 4  # CPU threads for inference (direct mode only)
 
 # Network Security Settings
 network:

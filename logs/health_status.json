@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-07-17T04:48:03.508215",
+  "timestamp": "2025-07-20T06:30:27.649924",
   "status": "degraded",
   "checks": {
     "processes": {
@@ -20,11 +20,11 @@
     "resources": {
       "status": "pass",
       "memory_ok": true,
-      "memory_available_mb": 13749,
+      "memory_available_mb": 13489,
       "disk_ok": true,
-      "disk_free_gb": 113,
+      "disk_free_gb": 83,
       "cpu_ok": true,
-      "cpu_percent": 19.4
+      "cpu_percent": 18.3
     },
     "network": {
       "status": "warn",
