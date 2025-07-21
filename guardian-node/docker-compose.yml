@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  guardian-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: guardian-node:latest
+    container_name: guardian-node
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./models:/app/models
+    environment:
+      - GUARDIAN_OFFLINE_MODE=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 5s
