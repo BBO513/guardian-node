@@ -1,495 +1,253 @@
 """
-Voice Interface for Guardian Node Family Assistant
-Integrates voice input/output with family cybersecurity assistance
+Family Voice Interface for Guardian Node
+Handles voice input/output for family-friendly interactions
 """
 
+import os
 import logging
-import threading
 import time
-from typing import Dict, Any, Optional, List, Callable
-from datetime import datetime
-
-# Import voice components
-from ..voice.voice_input import VoiceInput
-from ..voice.voice_output import VoiceOutput
-from .family_assistant_manager import FamilyAssistantManager
+from typing import Dict, Any, Optional
 
 class FamilyVoiceInterface:
     """
-    Voice interface for family cybersecurity assistance
-    Handles voice commands and provides spoken responses
+    Voice interface for family-friendly interactions
+    Handles speech recognition and text-to-speech with privacy controls
     """
     
-    def __init__(self, config: Dict[str, Any] = None, logger: logging.Logger = None,
-                 family_manager: FamilyAssistantManager = None):
+    def __init__(self, config: Dict[str, Any] = None, logger: logging.Logger = None, mock_mode: bool = False):
         self.config = config or {}
         self.logger = logger or logging.getLogger(__name__)
+        self.voice_config = self._get_voice_config()
+        self.privacy_mode = self.voice_config.get('privacy_mode', True)
+        self.offline_mode = self.voice_config.get('offline_mode', True)
+        self.mock_mode = mock_mode or self.voice_config.get('mock_mode', False)
         
-        # Initialize voice components
-        self.voice_input = VoiceInput(config, logger)
-        self.voice_output = VoiceOutput(config, logger)
-        
-        # Initialize family assistant manager
-        self.family_manager = family_manager or FamilyAssistantManager(config, logger)
-        
-        # Voice interface settings
-        self.voice_config = self.config.get('voice_interface', {})
-        self.wake_word = self.voice_config.get('wake_word', 'guardian')
-        self.session_timeout = self.voice_config.get('session_timeout', 30)
-        self.max_retries = self.voice_config.get('max_retries', 3)
-        
-        # Session management
-        self.active_session = False
-        self.session_start_time = None
-        self.session_lock = threading.Lock()
-        
-        # Command mapping
-        self.command_mappings = self._initialize_command_mappings()
-        
-        # Privacy and security
-        self.voice_privacy_mode = self.voice_config.get('privacy_mode', True)
-        self.require_confirmation = self.voice_config.get('require_confirmation', True)
-        
-        self.logger.info("FamilyVoiceInterface initialized")
+        # Initialize speech components
+        self._initialize_components()
     
-    def _initialize_command_mappings(self) -> Dict[str, Dict[str, Any]]:
-        """Initialize voice command mappings to family assistant functions"""
-        return {
-            # Cybersecurity education commands
-            'cyber safety': {
-                'skill': 'child_education_skill',
-                'description': 'Cybersecurity education for children',
-                'confirmation_required': False
-            },
-            'teach kids': {
-                'skill': 'child_education_skill', 
-                'description': 'Child cybersecurity education',
-                'confirmation_required': False
-            },
-            'online safety': {
-                'skill': 'child_education_skill',
-                'description': 'Online safety guidance',
-                'confirmation_required': False
-            },
-            
-            # Device security commands
-            'device security': {
-                'skill': 'device_guidance_skill',
-                'description': 'Device security guidance',
-                'confirmation_required': False
-            },
-            'phone security': {
-                'skill': 'device_guidance_skill',
-                'args': ['smartphone'],
-                'description': 'Smartphone security guidance',
-                'confirmation_required': False
-            },
-            'tablet security': {
-                'skill': 'device_guidance_skill',
-                'args': ['tablet'],
-                'description': 'Tablet security guidance',
-                'confirmation_required': False
-            },
-            
-            # Threat analysis commands
-            'current threats': {
-                'skill': 'threat_analysis_skill',
-                'description': 'Current cybersecurity threats',
-                'confirmation_required': False
-            },
-            'security threats': {
-                'skill': 'threat_analysis_skill',
-                'description': 'Security threat analysis',
-                'confirmation_required': False
-            },
-            
-            # General family assistance
-            'family security': {
-                'skill': 'family_cyber_skills',
-                'description': 'General family cybersecurity assistance',
-                'confirmation_required': False
-            },
-            'security help': {
-                'skill': 'family_cyber_skills',
-                'description': 'General security help',
-                'confirmation_required': False
-            },
-            
-            # System commands
-            'security scan': {
-                'function': 'run_security_scan',
-                'description': 'Run family security analysis',
-                'confirmation_required': True
-            },
-            'family status': {
-                'function': 'get_family_status',
-                'description': 'Get family security status',
-                'confirmation_required': False
-            }
-        }
+    def _get_voice_config(self) -> Dict[str, Any]:
+        """Get voice configuration from main config"""
+        family_config = self.config.get('family_assistant', {})
+        return family_config.get('voice_interface', {})
     
-    def is_available(self) -> bool:
-        """Check if voice interface is available"""
-        return self.voice_input.is_available() and self.voice_output.is_available()
+    def _initialize_components(self):
+        """Initialize speech recognition and synthesis components"""
+        try:
+            # Import optional speech components
+            import speech_recognition
+            import pyttsx3
+            
+            self.recognizer = speech_recognition.Recognizer()
+            self.engine = pyttsx3.init()
+            
+            # Configure TTS engine
+            self.engine.setProperty('rate', self.voice_config.get('speech_rate', 150))
+            self.engine.setProperty('volume', self.voice_config.get('volume', 0.8))
+            
+            # Set child-friendly voice if available
+            if self.voice_config.get('child_friendly_voice', True):
+                voices = self.engine.getProperty('voices')
+                # Try to find a female voice which tends to be more soothing for children
+                for voice in voices:
+                    if "female" in voice.name.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        break
+            
+            self.speech_components_available = True
+            self.logger.info("Voice interface components initialized")
+            
+        except ImportError:
+            self.speech_components_available = False
+            self.logger.warning("Speech components not available. Install speech_recognition and pyttsx3.")
     
     def start_voice_session(self, family_context: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Start an interactive voice session
+        Start a voice interaction session
         
         Args:
-            family_context: Family context including member info, preferences
+            family_context: Family profile and context information
             
         Returns:
-            Session result with success status and details
+            Dict with session results
         """
-        if not self.is_available():
-            return {
-                'success': False,
-                'error': 'Voice interface not available',
-                'message': 'Please check microphone and speaker setup'
-            }
-        
-        with self.session_lock:
-            if self.active_session:
-                return {
-                    'success': False,
-                    'error': 'Voice session already active',
-                    'message': 'Please wait for current session to complete'
-                }
-            
-            self.active_session = True
-            self.session_start_time = datetime.now()
+        if not self.speech_components_available:
+            self.logger.warning("Cannot start voice session - speech components not available")
+            return {'success': False, 'error': 'Speech components not available'}
         
         try:
-            # Welcome message
-            welcome_msg = self._get_welcome_message(family_context)
-            self.voice_output.speak_family_response(welcome_msg, family_context)
+            # Determine age group from context
+            age_group = self._get_age_group(family_context)
             
-            # Main interaction loop
-            session_result = self._run_voice_interaction_loop(family_context)
+            # Speak welcome message
+            welcome_message = self._get_welcome_message(age_group)
+            self._speak(welcome_message)
             
-            # Goodbye message
-            goodbye_msg = "Thank you for using Guardian Family Assistant. Stay safe online!"
-            self.voice_output.speak_family_response(goodbye_msg, family_context)
+            # Listen for command
+            self.logger.info("Listening for voice command...")
+            command = self._listen()
             
-            return session_result
+            if not command:
+                self._speak("I'm sorry, I didn't hear anything.")
+                return {'success': False, 'error': 'No speech detected'}
+            
+            # Process command
+            self.logger.info(f"Processing command: {command}")
+            
+            # Get response based on age group
+            response = self._get_response_for_command(command, age_group)
+            
+            # Speak response
+            self._speak(response)
+            
+            return {
+                'success': True,
+                'command': command,
+                'response': response,
+                'age_group': age_group
+            }
             
         except Exception as e:
             self.logger.error(f"Voice session error: {e}")
-            error_msg = "I'm sorry, I encountered an error. Please try again later."
-            self.voice_output.speak_text(error_msg)
-            
-            return {
-                'success': False,
-                'error': str(e),
-                'message': 'Voice session failed'
-            }
-        
-        finally:
-            with self.session_lock:
-                self.active_session = False
-                self.session_start_time = None
+            self._speak("I'm sorry, there was a problem with the voice assistant.")
+            return {'success': False, 'error': str(e)}
     
-    def _run_voice_interaction_loop(self, family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Run the main voice interaction loop"""
-        interactions = []
-        retry_count = 0
+    def _get_age_group(self, family_context: Optional[Dict[str, Any]]) -> str:
+        """Determine age group from family context"""
+        if not family_context:
+            return 'adult'
         
-        while retry_count < self.max_retries:
-            # Check session timeout
-            if self._is_session_expired():
-                self.voice_output.speak_text("Session timeout. Goodbye!")
-                break
-            
-            # Listen for user input
-            self.voice_output.speak_text("How can I help you?")
-            recognition_result = self.voice_input.recognize_speech(timeout=10)
-            
-            if not recognition_result['success']:
-                retry_count += 1
-                if retry_count < self.max_retries:
-                    self.voice_output.speak_text("I didn't catch that. Could you please repeat?")
-                    continue
-                else:
-                    self.voice_output.speak_text("I'm having trouble hearing you. Please try again later.")
-                    break
-            
-            user_input = recognition_result['text'].lower()
-            
-            # Check for exit commands
-            if any(word in user_input for word in ['goodbye', 'bye', 'exit', 'quit', 'stop']):
-                break
-            
-            # Process the command
-            response_result = self._process_voice_command(user_input, family_context)
-            interactions.append({
-                'user_input': user_input,
-                'response': response_result,
-                'timestamp': datetime.now().isoformat()
-            })
-            
-            # Speak the response
-            if response_result.get('success'):
-                self.voice_output.speak_family_response(
-                    response_result['response'], 
-                    family_context
-                )
-            else:
-                error_msg = "I'm sorry, I couldn't process that request. Could you try asking differently?"
-                self.voice_output.speak_text(error_msg)
-            
-            # Reset retry count on successful interaction
-            retry_count = 0
+        members = family_context.get('members', [])
+        if not members:
+            return 'adult'
         
-        return {
-            'success': True,
-            'interactions': interactions,
-            'total_interactions': len(interactions),
-            'session_duration': (datetime.now() - self.session_start_time).total_seconds()
-        }
+        # Use first member's age group
+        return members[0].get('age_group', 'adult')
     
-    def _process_voice_command(self, user_input: str, family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process a voice command and return response
+    def _get_welcome_message(self, age_group: str) -> str:
+        """Get age-appropriate welcome message"""
+        if age_group == 'child':
+            return "Hi there! I'm your Guardian helper. What would you like to know about staying safe online?"
+        elif age_group == 'teen':
+            return "Hey! I'm your Guardian assistant. How can I help with your online security today?"
+        else:
+            return "Hello. I'm your Guardian security assistant. How may I help you?"
+    
+    def _listen(self) -> Optional[str]:
+        """Listen for voice input"""
+        # Use mock mode for testing without actual speech recognition
+        if self.mock_mode:
+            self.logger.info("Mock mode active. Simulating voice input.")
+            import random
+            mock_commands = [
+                "How do I create a strong password?",
+                "What should I do if someone asks for my personal information online?",
+                "How can I stay safe on social media?",
+                "What are parental controls?"
+            ]
+            return random.choice(mock_commands)
         
-        Args:
-            user_input: Recognized speech text
-            family_context: Family context information
-            
-        Returns:
-            Response result with success status and message
-        """
         try:
-            # Find matching command
-            command_info = self._match_command(user_input)
+            # Import Microphone class
+            from speech_recognition import Microphone
             
-            if not command_info:
-                # No specific command matched, try general query processing
-                return self._process_general_query(user_input, family_context)
+            with Microphone() as source:
+                self.recognizer.adjust_for_ambient_noise(source)
+                audio = self.recognizer.listen(
+                    source,
+                    timeout=self.voice_config.get('timeout', 5),
+                    phrase_time_limit=self.voice_config.get('phrase_timeout', 5)
+                )
             
-            # Check if confirmation is required
-            if command_info.get('confirmation_required') and self.require_confirmation:
-                if not self._get_voice_confirmation(command_info['description']):
-                    return {
-                        'success': True,
-                        'response': "Okay, I won't run that command.",
-                        'command': 'cancelled'
-                    }
-            
-            # Execute the command
-            if 'skill' in command_info:
-                return self._execute_skill_command(command_info, user_input, family_context)
-            elif 'function' in command_info:
-                return self._execute_function_command(command_info, user_input, family_context)
+            # Use offline recognition if configured
+            if self.offline_mode:
+                return self.recognizer.recognize_sphinx(audio)
             else:
-                return {
-                    'success': False,
-                    'response': "I'm not sure how to handle that command.",
-                    'error': 'Unknown command type'
-                }
+                return self.recognizer.recognize_google(audio)
                 
         except Exception as e:
-            self.logger.error(f"Error processing voice command: {e}")
-            return {
-                'success': False,
-                'response': "I encountered an error processing your request.",
-                'error': str(e)
-            }
+            self.logger.error(f"Error listening: {e}")
+            return None
     
-    def _match_command(self, user_input: str) -> Optional[Dict[str, Any]]:
-        """Match user input to a command"""
-        user_input_lower = user_input.lower()
-        
-        # Look for exact or partial matches
-        for command_phrase, command_info in self.command_mappings.items():
-            if command_phrase in user_input_lower:
-                return command_info
-        
-        return None
-    
-    def _execute_skill_command(self, command_info: Dict[str, Any], user_input: str, 
-                              family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a family skill command"""
-        skill_name = command_info['skill']
-        args = command_info.get('args', [])
-        
-        # Add user input as context
-        context = family_context.copy() if family_context else {}
-        context['voice_query'] = user_input
-        
-        # Execute the skill
-        skill_result = self.family_manager.run_family_skill(skill_name, *args, context=context)
-        
-        if skill_result.get('success'):
-            response = skill_result.get('result', 'Command completed successfully.')
-            if isinstance(response, dict):
-                response = response.get('response', str(response))
+    def _speak(self, text: str):
+        """Convert text to speech"""
+        if self.privacy_mode:
+            self.logger.info(f"Privacy mode active. Would speak: {text}")
+            # In privacy mode, log but don't actually speak
+            return
             
-            return {
-                'success': True,
-                'response': str(response),
-                'skill_used': skill_name
-            }
-        else:
-            return {
-                'success': False,
-                'response': f"I had trouble with the {command_info['description']} command.",
-                'error': skill_result.get('error')
-            }
-    
-    def _execute_function_command(self, command_info: Dict[str, Any], user_input: str,
-                                 family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a function command"""
-        function_name = command_info['function']
-        
-        if function_name == 'run_security_scan':
-            return self._run_security_scan(family_context)
-        elif function_name == 'get_family_status':
-            return self._get_family_status(family_context)
-        else:
-            return {
-                'success': False,
-                'response': f"Unknown function: {function_name}",
-                'error': 'Function not implemented'
-            }
-    
-    def _process_general_query(self, user_input: str, family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a general query using the family assistant manager"""
         try:
-            context = family_context.copy() if family_context else {}
-            context['voice_input'] = True
-            
-            result = self.family_manager.process_family_query(user_input, context)
-            
-            return {
-                'success': True,
-                'response': result.get('response', 'I processed your request.'),
-                'confidence': result.get('confidence', 0.5),
-                'skill_used': result.get('skill_used', 'general')
-            }
-            
+            self.engine.say(text)
+            self.engine.runAndWait()
         except Exception as e:
-            self.logger.error(f"Error processing general query: {e}")
-            return {
-                'success': False,
-                'response': "I had trouble processing your question.",
-                'error': str(e)
-            }
+            self.logger.error(f"Error speaking: {e}")
     
-    def _get_voice_confirmation(self, action_description: str) -> bool:
-        """Get voice confirmation for sensitive actions"""
-        try:
-            confirmation_msg = f"Are you sure you want to {action_description}? Please say yes or no."
-            self.voice_output.speak_text(confirmation_msg)
-            
-            result = self.voice_input.recognize_speech(timeout=10)
-            
-            if result['success']:
-                response = result['text'].lower()
-                return any(word in response for word in ['yes', 'yeah', 'okay', 'sure', 'confirm'])
-            
-            return False
-            
-        except Exception as e:
-            self.logger.error(f"Error getting voice confirmation: {e}")
-            return False
-    
-    def _run_security_scan(self, family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Run a family security scan"""
-        try:
-            family_profile = family_context.get('family_profile', {})
-            if not family_profile:
-                return {
-                    'success': False,
-                    'response': "I need family profile information to run a security scan.",
-                    'error': 'No family profile'
-                }
-            
-            analysis_result = self.family_manager.analyze_family_security(family_profile)
-            
-            # Format response for voice
-            status = analysis_result.status
-            score = analysis_result.overall_score
-            
-            if status == "secure":
-                response = f"Great news! Your family's security looks good with a score of {score:.0f} out of 100."
-            elif status == "warning":
-                response = f"Your family security needs some attention. Current score is {score:.0f} out of 100. I found some areas for improvement."
+    def _get_response_for_command(self, command: str, age_group: str) -> str:
+        """
+        Get response for voice command
+        
+        In a real implementation, this would integrate with the family assistant manager
+        For now, we'll use simple pattern matching for demo purposes
+        """
+        command_lower = command.lower()
+        
+        # Child-appropriate responses
+        if age_group == 'child':
+            if any(word in command_lower for word in ['password', 'passwords']):
+                return "Passwords are like secret codes that keep your information safe. It's important to use different passwords for different places and never share them with anyone except your parents."
+                
+            elif any(word in command_lower for word in ['internet', 'online', 'web']):
+                return "The internet is a place where we can learn and have fun, but we need to be careful. Always ask a grown-up before clicking on things or talking to people online."
+                
+            elif any(word in command_lower for word in ['stranger', 'strangers']):
+                return "Remember, never talk to strangers online or share your personal information. If someone you don't know tries to talk to you, tell a grown-up right away."
+                
             else:
-                response = f"I found some important security issues that need attention. Your current score is {score:.0f} out of 100."
-            
-            return {
-                'success': True,
-                'response': response,
-                'analysis_result': analysis_result
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error running security scan: {e}")
-            return {
-                'success': False,
-                'response': "I had trouble running the security scan.",
-                'error': str(e)
-            }
-    
-    def _get_family_status(self, family_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Get family security status"""
-        try:
-            # This would integrate with the family manager to get current status
-            response = "Your Guardian Node is running and monitoring your family's digital security. All systems are operational."
-            
-            return {
-                'success': True,
-                'response': response
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error getting family status: {e}")
-            return {
-                'success': False,
-                'response': "I had trouble getting the family status.",
-                'error': str(e)
-            }
-    
-    def _get_welcome_message(self, family_context: Dict[str, Any]) -> str:
-        """Get personalized welcome message"""
-        member_name = family_context.get('member_name') if family_context else None
+                return "That's a great question! Let's ask a grown-up to help us learn more about staying safe online."
         
-        if member_name:
-            return f"Hello {member_name}! I'm your Guardian Family Assistant. How can I help keep your family safe online today?"
+        # Teen-appropriate responses
+        elif age_group == 'teen':
+            if any(word in command_lower for word in ['password', 'passwords']):
+                return "Strong passwords are essential for online security. Use a mix of letters, numbers, and symbols, and consider using a password manager to keep track of different passwords for different sites."
+                
+            elif any(word in command_lower for word in ['social', 'media', 'instagram', 'tiktok']):
+                return "On social media, be careful about what you share. Check your privacy settings regularly, and remember that anything you post might be seen by more people than you intended."
+                
+            elif any(word in command_lower for word in ['privacy', 'private']):
+                return "Protecting your privacy online is important. Regularly review app permissions, use private browsing when needed, and be thoughtful about the information you share online."
+                
+            else:
+                return "That's a good question about online security. I can help you find more information about staying safe online."
+        
+        # Adult responses
         else:
-            return "Hello! I'm your Guardian Family Assistant. How can I help keep your family safe online today?"
-    
-    def _is_session_expired(self) -> bool:
-        """Check if the current session has expired"""
-        if not self.session_start_time:
-            return False
-        
-        elapsed = (datetime.now() - self.session_start_time).total_seconds()
-        return elapsed > self.session_timeout
-    
-    def stop_session(self):
-        """Stop the current voice session"""
-        with self.session_lock:
-            if self.active_session:
-                self.voice_output.stop_speech()
-                self.active_session = False
-                self.session_start_time = None
-                self.logger.info("Voice session stopped")
+            if any(word in command_lower for word in ['password', 'passwords']):
+                return "Password security is critical. Use strong, unique passwords for each account, enable two-factor authentication where available, and consider using a reputable password manager."
+                
+            elif any(word in command_lower for word in ['network', 'wifi']):
+                return "To secure your home network, use WPA3 encryption if available, change default router credentials, keep firmware updated, and consider setting up a guest network for visitors."
+                
+            elif any(word in command_lower for word in ['child', 'children', 'kids']):
+                return "For child online safety, use parental controls, maintain open communication about online activities, set clear boundaries, and educate children about potential online risks in an age-appropriate way."
+                
+            else:
+                return "I understand you're asking about cybersecurity. Could you provide more specific details about what you'd like to know?"
 
-# Convenience function for simple voice session
-def run_voice_session(config: Dict[str, Any] = None, logger: logging.Logger = None,
-                     family_context: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Run a simple voice session with the family assistant
+# For testing
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("voice_test")
     
-    Args:
-        config: Configuration dictionary
-        logger: Logger instance
-        family_context: Family context information
-        
-    Returns:
-        Session result
-    """
-    voice_interface = FamilyVoiceInterface(config, logger)
-    return voice_interface.start_voice_session(family_context)
+    voice = FamilyVoiceInterface(logger=logger)
+    
+    # Test with different family contexts
+    contexts = [
+        {'members': [{'name': 'Child', 'age_group': 'child'}]},
+        {'members': [{'name': 'Teen', 'age_group': 'teen'}]},
+        {'members': [{'name': 'Parent', 'age_group': 'adult'}]}
+    ]
+    
+    for context in contexts:
+        print(f"\nTesting with context: {context}")
+        result = voice.start_voice_session(context)
+        print(f"Result: {result}")
+        time.sleep(1)  # Pause between tests

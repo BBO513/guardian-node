@@ -404,99 +404,24 @@ class FamilyAssistantManager:
         Returns:
             Family-friendly response
         """
-        try:
-            # Determine age group and context from input
-            age_group = self._determine_age_group(context)
-            query_type = self._determine_query_type(query)
-            
-            # Switch to appropriate model if using direct LLM
-            if self.llm:
-                llm_context = {
-                    'age_group': age_group,
-                    'query_type': query_type
-                }
-                self.llm.switch_model(llm_context)
-            
-            # Create family-friendly prompt
-            if child_safe:
-                prompt = f"Provide a child-safe family cybersecurity response to: {query}. Use simple language, analogies that kids understand, and focus on staying safe online. Avoid scary technical terms."
-            else:
-                prompt = f"Provide a family-friendly cybersecurity response to: {query}. Use clear language appropriate for parents and teens. Include practical advice."
-            
-            # Generate response using LLM
-            if self.llm and self.llm.is_loaded():
-                if hasattr(self.llm, 'generate_family_response'):
-                    # Use specialized family response generation if available
-                    try:
-                        from guardian_interpreter.family_llm_prompts import FamilyContext, ChildSafetyLevel
-                        family_context = FamilyContext.CHILD_EDUCATION if child_safe else FamilyContext.PARENT_GUIDANCE
-                        safety_level = ChildSafetyLevel.STRICT if child_safe else ChildSafetyLevel.STANDARD
-                        
-                        response = self.llm.generate_family_response(
-                            query,
-                            context=family_context,
-                            child_safe_mode=child_safe,
-                            safety_level=safety_level,
-                            family_profile=context
-                        )
-                    except ImportError:
-                        # Fall back to regular response generation
-                        response = self.llm.generate_response(prompt)
-                else:
-                    response = self.llm.generate_response(prompt)
-            else:
-                # Fallback response when LLM is not available
-                response = self._generate_fallback_family_response(query, child_safe)
-            
-            # Apply additional family-friendly formatting
-            formatted_response = self.format_response(response, child_safe)
-            
-            # Log the interaction
-            if self.audit_logger:
-                self.audit_logger.log_user_action("Family query processed with LLM", {
-                    'query_type': query_type,
-                    'age_group': age_group,
-                    'child_safe': child_safe,
-                    'response_length': len(formatted_response)
-                })
-            
-            return formatted_response
-            
-        except Exception as e:
-            self.logger.error(f"Error processing family query: {e}")
-            return self._generate_error_response(child_safe)
+        prompt = f"Provide a {'child-safe' if child_safe else 'standard'} family response to: {query}. Use simple language and analogies for kids."
+        response = self.llm.generate_response(prompt)
+        return self.format_response(response, child_safe)
     
     def format_response(self, response: str, child_safe: bool = True) -> str:
         """
-        Enhanced response formatting with LLM-aware family-friendly adjustments
+        Enhanced response formatting with family-friendly adjustments
         
         Args:
-            response: Raw response from LLM or fallback
+            response: Raw response from LLM
             child_safe: Whether to apply child-safe formatting
             
         Returns:
             Formatted family-friendly response
         """
         if child_safe:
-            # Apply child-safe transformations
-            formatted = response.replace("risk", "challenge")
-            formatted = formatted.replace("threat", "something to watch out for")
-            formatted = formatted.replace("attack", "bad thing that might happen")
-            formatted = formatted.replace("vulnerability", "weak spot")
-            formatted = formatted.replace("malware", "bad software")
-            formatted = formatted.replace("phishing", "trick emails")
-            formatted = formatted.replace("hacker", "person trying to cause trouble")
-            
-            # Add encouraging prefix for children
-            if not formatted.startswith("Kid-friendly:"):
-                formatted = f"Kid-friendly: {formatted}"
-                
-            return formatted
-        else:
-            # Standard family formatting (less aggressive substitutions)
-            formatted = response.replace("exploit", "take advantage of")
-            formatted = formatted.replace("breach", "break into")
-            return formatted
+            return "Kid-friendly: " + response.replace("risk", "challenge").replace("threat", "lesson")
+        return response
     
     def format_family_response(self, technical_response: str, context: Dict[str, Any] = None) -> str:
         """
@@ -592,8 +517,8 @@ class FamilyAssistantManager:
                 return "Sorry, an error occurred while running the skill. Please try again or check logs."
         return "Skill not found. Please try a different skill."
     
-    def format_response(self, response: str, child_safe: bool = True) -> str:
-        """Format response for family-friendly output"""
+    def _legacy_format_response(self, response: str, child_safe: bool = True) -> str:
+        """Legacy format response method (kept for backward compatibility)"""
         if child_safe:
             return f"Family-safe: {response}"
         return response

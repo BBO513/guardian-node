@@ -440,23 +440,10 @@ class GuardianMainWindow(QMainWindow):
     def handle_mode_change(self, mode: str):
         """Handle mode changes and integrate with backend"""
         self.current_mode = mode
-        print(f"🔄 Mode changed to: {mode}")
-        
-        # Integrate with backend
-        if self.guardian:
-            try:
-                # Update family profile based on mode
-                family_profile = self.get_family_profile_for_mode(mode)
-                
-                # Log mode change
-                if hasattr(self.guardian, 'audit_logger') and self.guardian.audit_logger:
-                    self.guardian.audit_logger.log_user_action("GUI mode changed", {
-                        'new_mode': mode,
-                        'family_profile': family_profile.get('family_id', 'unknown'),
-                        'timestamp': datetime.now().isoformat()
-                    })
-            except Exception as e:
-                print(f"Error integrating mode change with backend: {e}")
+        if self.guardian and hasattr(self.guardian, 'family_manager'):
+            profile = self.get_family_profile_for_mode(mode)
+            self.guardian.family_manager.update_profile(profile)
+            self.status_widget.update_status()
     
     def get_family_profile_for_mode(self, mode: str) -> Dict[str, Any]:
         """Get family profile configuration for the selected mode"""
@@ -503,13 +490,29 @@ class GuardianMainWindow(QMainWindow):
     
     def start_voice_session(self):
         """Start voice assistant session"""
+        from family_assistant.voice_interface import FamilyVoiceInterface
+        
+        # Update status
         print("Starting voice session...")
         self.status_widget.status_label.setText("🎤 Listening...")
         self.status_widget.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
         
-        # Simulate voice session
-        QTimer.singleShot(2000, lambda: self.status_widget.status_label.setText("🔊 Processing command..."))
-        QTimer.singleShot(5000, lambda: self.status_widget.status_label.setText("🟢 Voice command completed"))
+        # Get family context based on current mode
+        family_context = self.get_family_profile_for_mode(self.current_mode)
+        
+        # Initialize voice interface
+        voice_interface = FamilyVoiceInterface(config=self.guardian.config, logger=self.guardian.logger)
+        result = voice_interface.start_voice_session(family_context)
+        
+        # Update status based on result
+        if result and result.get('success'):
+            self.status_widget.status_label.setText("🟢 Voice command completed")
+        else:
+            self.status_widget.status_label.setText("🔴 Voice command failed")
+            
+        # Show response if available
+        if result and 'response' in result:
+            print(f"Voice response: {result['response']}")
     
     def toggle_voice_privacy(self):
         """Toggle voice privacy mode"""
@@ -671,6 +674,18 @@ class GuardianMainWindow(QMainWindow):
         score_layout.addWidget(score_label)
         score_layout.addWidget(score_bar)
         layout.addLayout(score_layout)
+        
+        # Add chart visualization
+        from guardian_interpreter.canvas import show_chart  # Assume canvas module
+        layout.addWidget(show_chart({
+            'type': 'bar', 
+            'data': {
+                'labels': ['Score'], 
+                'datasets': [
+                    {'label': 'Security', 'data': [85], 'backgroundColor': '#4CAF50'}
+                ]
+            }
+        }))
         
         # Analysis details
         analysis = QTextEdit()

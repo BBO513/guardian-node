@@ -2,116 +2,77 @@ version: '3.8'
 
 services:
   guardian-node:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: guardian-node-family
-    hostname: guardian-node
+    build: .
+    container_name: guardian-node-family-assistant
     ports:
-      - "8080:8080"   # Main web interface
-      - "8443:8443"   # Secure web interface (if enabled)
+      - "8000:8000"
+      - "8080:8080"  # GUI interface
+    volumes:
+      # Mount models directory for GGUF models
+      - ./models:/app/models:ro
+      # Mount data directory for family profiles and logs
+      - ./data:/app/data
+      # Mount logs directory
+      - ./logs:/app/logs
     environment:
-      - TZ=UTC
+      # LLM Model Configuration
+      - GUARDIAN_LLM_MODEL_PATH=/app/models/phi-3-mini-4k-instruct-q4.gguf
+      - GUARDIAN_MODELS_DIR=/app/models
+      
+      # Family Assistant Configuration
       - GUARDIAN_MODE=family
-      - GUARDIAN_OFFLINE=true
-      - GUARDIAN_GUI_ENABLED=true
-      - GUARDIAN_FAMILY_MODE=true
-      - PYTHONPATH=/app
-    volumes:
-      # Persistent data storage
-      - guardian_data:/data
-      - guardian_logs:/logs
-      - guardian_models:/app/models
-      - guardian_config:/app/config
-      # Optional: Mount local config for development
-      # - ./guardian_interpreter/config.yaml:/app/guardian_interpreter/config.yaml:ro
+      - GUARDIAN_OFFLINE_MODE=true
+      - GUARDIAN_LOG_LEVEL=INFO
+      - GUARDIAN_HEALTH_PORT=8080
+      
+      # Security Configuration
+      - GUARDIAN_ENCRYPT_DATA=true
+      - GUARDIAN_AUDIT_LOGGING=true
+      
+      # Performance Configuration (Raspberry Pi optimized)
+      - GUARDIAN_MAX_MEMORY_MB=2048
+      - GUARDIAN_CPU_THREADS=4
+      - GUARDIAN_MODEL_CACHE_SIZE=512
+      
     restart: unless-stopped
-    
-    # Resource limits optimized for Raspberry Pi 5 (16GB RAM)
-    deploy:
-      resources:
-        limits:
-          cpus: '3.0'      # Use up to 3 CPU cores
-          memory: 12G      # Use up to 12GB RAM (leave 4GB for system)
-        reservations:
-          cpus: '0.5'      # Reserve at least 0.5 CPU
-          memory: 2G       # Reserve at least 2GB RAM
-    
-    # Health check configuration
     healthcheck:
-      test: ["CMD", "python", "/app/health_check.py"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
-      start_period: 120s   # Allow 2 minutes for startup
     
-    # Security settings
-    security_opt:
-      - no-new-privileges:true
-    read_only: false  # Set to true for extra security, but may need adjustments
-    
-    # Network configuration
-    networks:
-      - guardian_network
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
-
-  # Optional: Add a lightweight web dashboard
-  guardian-dashboard:
-    image: nginx:alpine
-    container_name: guardian-dashboard
-    ports:
-      - "80:80"
-    volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/dashboard:/usr/share/nginx/html:ro
-    depends_on:
-      - guardian-node
-    networks:
-      - guardian_network
-    restart: unless-stopped
+    # Resource limits for Raspberry Pi
     deploy:
       resources:
         limits:
-          cpus: '0.2'
-          memory: 128M
+          memory: 3G
+          cpus: '3.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
 
-# Named volumes for persistent storage
+  # Optional: Monitoring service
+  guardian-monitor:
+    image: prom/prometheus:latest
+    container_name: guardian-monitor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    profiles:
+      - monitoring
+
 volumes:
   guardian_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data
   guardian_logs:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./logs
-  guardian_models:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./models
-  guardian_config:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./config
 
-# Custom network for Guardian services
 networks:
-  guardian_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet:  172.31.77.0/24
+  default:
+    name: guardian-network
