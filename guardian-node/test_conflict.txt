@@ -1,0 +1,9 @@
+This is a test file with merge conflict markers.
+
+<<<<<<< HEAD
+This is the local version.
+=======
+This is the remote version.
+>>>>>>> remote-branch
+
+End of file.
