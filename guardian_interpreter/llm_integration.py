@@ -14,14 +14,21 @@ except ImportError:
     Llama = None
 
 class GuardianLLM:
+    """
+    Local LLM handler for Guardian Interpreter
+    Simplified implementation with direct GGUF model loading and context-based switching
+    """
+    
     def __init__(self, config: Dict[str, Any], logger: logging.Logger):
-        self.config = config
+        self.models = config.get('llm', {}).get('models', {})
+        self.current_model = None
         self.logger = logger
         self.llm = None
         self.model_loaded = False
         self.model_path = None
+        self.load_default_model()
 
-    def load_model(self) -> bool:
+    def load_default_model(self) -> bool:
         if not LLAMA_CPP_AVAILABLE:
             self.logger.error("llama-cpp-python not available. Install with: pip install llama-cpp-python")
             return False
@@ -149,3 +156,4 @@ def create_llm(config: Dict[str, Any], logger: logging.Logger) -> GuardianLLM:
         return GuardianLLM(config, logger)
     else:
         return MockLLM(config, logger)
+             

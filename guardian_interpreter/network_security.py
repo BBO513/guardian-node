@@ -8,6 +8,9 @@ import socket
 import urllib.parse
 import logging
 import time
+import os
+import json
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 import threading
 
@@ -237,7 +240,7 @@ class NetworkSecurityManager:
 class AuditLogger:
     """
     Enhanced audit logging for Guardian Interpreter
-    Tracks all user actions, system events, and security incidents
+    Tracks all user actions, system events, security incidents, and family activities
     """
     
     def __init__(self, config: Dict[str, Any], logger: logging.Logger):
@@ -245,6 +248,11 @@ class AuditLogger:
         self.logger = logger
         self.audit_events = []
         self.audit_lock = threading.Lock()
+        
+        # Family-specific logging
+        self.log_dir = config.get('logging', {}).get('log_directory', 'logs')
+        os.makedirs(self.log_dir, exist_ok=True)
+        self.family_log_file = os.path.join(self.log_dir, "family_audit.log")
         
         # Setup audit logging
         self._setup_audit_logging()
@@ -333,6 +341,183 @@ class AuditLogger:
             
             return events[-limit:] if events else []
     
+    def log_family_activity(self, family_id: str, activity_type: str, details: Dict[str, Any] = None):
+        """
+        Log family assistant activity with privacy protection
+        
+        Args:
+            family_id: Family identifier
+            activity_type: Type of family activity (e.g., 'query', 'recommendation', 'skill_execution')
+            details: Activity details (will be redacted for sensitive info)
+        """
+        record = {
+            "timestamp": datetime.now().isoformat(),
+            "family_id": family_id,
+            "activity_type": activity_type,
+            "details": self._redact_sensitive(details or {}),
+            "session_id": details.get('session_id') if details else None
+        }
+        self._write_family_log(record)
+        
+        # Also log to main audit trail
+        self.log_event('FAMILY', f"Family activity: {activity_type}", {
+            'family_id': family_id,
+            'activity_type': activity_type
+        })
+    
+    def log_family_security_event(self, family_id: str, event_type: str, details: Dict[str, Any] = None):
+        """
+        Log family-specific security events
+        
+        Args:
+            family_id: Family identifier
+            event_type: Type of security event
+            details: Event details (will be redacted for sensitive info)
+        """
+        record = {
+            "timestamp": datetime.now().isoformat(),
+            "family_id": family_id,
+            "security_event_type": event_type,
+            "details": self._redact_sensitive(details or {})
+        }
+        self._write_family_log(record)
+        
+        # Also log to main audit trail as security event
+        self.log_event('SECURITY', f"Family security event: {event_type}", {
+            'family_id': family_id,
+            'event_type': event_type
+        })
+    
+    def _write_family_log(self, record: Dict[str, Any]):
+        """Write record to family-specific audit log"""
+        try:
+            with open(self.family_log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception as e:
+            self.logger.error(f"Failed to write family audit log: {e}")
+    
+    def _redact_sensitive(self, details: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Remove or mask sensitive fields for privacy compliance
+        
+        Args:
+            details: Dictionary that may contain sensitive information
+            
+        Returns:
+            Dictionary with sensitive fields redacted
+        """
+        if not isinstance(details, dict):
+            return details
+        
+        # List of sensitive field names to redact
+        sensitive_fields = {
+            "password", "token", "secret", "ssn", "social_security",
+            "credit_card", "bank_account", "api_key", "private_key",
+            "email", "phone", "address", "full_name", "real_name"
+        }
+        
+        redacted = {}
+        for key, value in details.items():
+            key_lower = key.lower()
+            if any(sensitive in key_lower for sensitive in sensitive_fields):
+                redacted[key] = "***REDACTED***"
+            elif isinstance(value, dict):
+                redacted[key] = self._redact_sensitive(value)
+            else:
+                redacted[key] = value
+        
+        return redacted
+    
+    def get_family_logs(self, family_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Returns audit logs for a specific family (privacy-respecting)
+        
+        Args:
+            family_id: Family identifier
+            limit: Maximum number of logs to return
+            
+        Returns:
+            List of family audit log entries
+        """
+        logs = []
+        if not os.path.exists(self.family_log_file):
+            return logs
+        
+        try:
+            with open(self.family_log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        record = json.loads(line.strip())
+                        if record.get("family_id") == family_id:
+                            logs.append(record)
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Return most recent logs first, limited by the specified limit
+            return logs[-limit:] if len(logs) > limit else logs
+            
+        except Exception as e:
+            self.logger.error(f"Failed to read family audit logs: {e}")
+            return []
+    
+    def get_family_audit_summary(self, family_id: str = None) -> Dict[str, Any]:
+        """
+        Get summary of family audit activities
+        
+        Args:
+            family_id: Optional family ID to filter by
+            
+        Returns:
+            Summary statistics for family audit logs
+        """
+        if not os.path.exists(self.family_log_file):
+            return {
+                'total_family_events': 0,
+                'activity_types': {},
+                'security_events': 0,
+                'families_tracked': 0
+            }
+        
+        activity_types = {}
+        security_events = 0
+        families = set()
+        total_events = 0
+        
+        try:
+            with open(self.family_log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        record = json.loads(line.strip())
+                        
+                        # Filter by family_id if specified
+                        if family_id and record.get("family_id") != family_id:
+                            continue
+                        
+                        total_events += 1
+                        families.add(record.get("family_id", "unknown"))
+                        
+                        # Count activity types
+                        activity_type = record.get("activity_type")
+                        if activity_type:
+                            activity_types[activity_type] = activity_types.get(activity_type, 0) + 1
+                        
+                        # Count security events
+                        if record.get("security_event_type"):
+                            security_events += 1
+                            
+                    except json.JSONDecodeError:
+                        continue
+                        
+        except Exception as e:
+            self.logger.error(f"Failed to generate family audit summary: {e}")
+        
+        return {
+            'total_family_events': total_events,
+            'activity_types': activity_types,
+            'security_events': security_events,
+            'families_tracked': len(families) if not family_id else 1
+        }
+    
     def get_audit_summary(self) -> Dict[str, Any]:
         """Get audit summary statistics"""
         with self.audit_lock:
@@ -341,9 +526,13 @@ class AuditLogger:
                 cat = event['category']
                 categories[cat] = categories.get(cat, 0) + 1
             
+            # Include family audit summary
+            family_summary = self.get_family_audit_summary()
+            
             return {
                 'total_events': len(self.audit_events),
                 'categories': categories,
-                'recent_events': self.audit_events[-10:] if self.audit_events else []
+                'recent_events': self.audit_events[-10:] if self.audit_events else [],
+                'family_audit_summary': family_summary
             }
 

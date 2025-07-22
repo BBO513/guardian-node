@@ -180,14 +180,43 @@ python main.py
 
 ### 4. Basic Usage
 
+#### CLI Mode (Default)
+```bash
+# Start in CLI mode
+python main.py
+
+# Family assistant commands
+guardian-family> help                           # Show family commands
+guardian-family> family skills                  # List family skills
+guardian-family> family skill threat_analysis   # Run threat analysis
+guardian-family> ask "How do I protect my child online?"  # Ask family question
+guardian-family> family analyze                 # Analyze family security
+guardian-family> family recommendations         # Get security recommendations
 ```
-Guardian> help                    # Show available commands
-Guardian> skills                  # List available skills
-Guardian> skill 1                 # Run first skill
-Guardian> skill lan_scanner       # Run skill by name
-Guardian> nodie Hello Nodie       # Chat with AI (if model loaded)
-Guardian> status                  # Show system status
-Guardian> quit                    # Exit
+
+#### GUI Mode (Family-Friendly Interface)
+```bash
+# Start with GUI interface
+python main.py --gui
+
+# Features:
+# - Visual mode switching (Kids/Teens/Adult)
+# - System status monitoring
+# - Family profile management
+# - Security recommendations display
+# - Voice assistant integration
+```
+
+#### Advanced Options
+```bash
+# Enable MCP server integration
+python main.py --mcp
+
+# Enable family mode with enhanced features
+python main.py --family-mode
+
+# Combine options
+python main.py --gui --family-mode
 ```
 
 ---
@@ -416,14 +445,40 @@ For issues, feature requests, or contributions, please contact the owner.
 
 ---
 
-## 🎯 Roadmap
+## ✅ Completed Features (v1.0.0)
 
-- [ ] GUI interface integration (PySide6)
-- [ ] Additional protocol modules
-- [ ] Enhanced security features
-- [ ] Performance optimizations
-- [ ] Docker containerization
-- [ ] Raspberry Pi optimization
+### Family Cybersecurity Assistant
+- **Family-Friendly LLM Integration** - Enhanced prompts with child safety filtering
+- **Age-Appropriate Skills** - Threat analysis, device guidance, and child education
+- **Family Profile Management** - Multi-mode support (Kids/Teens/Adult)
+- **Security Recommendations** - Personalized family cybersecurity guidance
+
+### GUI Interface (PySide6)
+- **Mode Switching Interface** - Visual mode selection with themed graphics
+- **System Status Monitoring** - Real-time CPU, memory, and temperature display
+- **Family Assistant Controls** - Voice assistant, profile management, recommendations
+- **Raspberry Pi Touchscreen Optimized** - 800x480 resolution with touch-friendly UI
+
+### Production Deployment
+- **Docker Containerization** - Complete containerized deployment with health checks
+- **LLM Integration** - Real LLM model support with family-friendly response formatting
+- **Comprehensive Testing** - Unit, integration, and end-to-end test suites
+- **Cross-Platform Support** - Windows, Linux, and ARM64 (Raspberry Pi) compatibility
+
+### Enhanced Security & Privacy
+- **Family Data Encryption** - Secure local storage with tamper protection
+- **Comprehensive Audit Logging** - Family-specific activity tracking
+- **Child Safety Filtering** - Age-appropriate content filtering at multiple levels
+- **Offline-First Operation** - Complete functionality without internet connectivity
+
+## 🎯 Future Roadmap
+
+- [ ] Advanced family learning analytics
+- [ ] Gamified cybersecurity education
+- [ ] Voice recognition and natural language processing
+- [ ] Advanced threat simulation and training
+- [ ] Multi-language family support
+- [ ] Enhanced IoT device security analysis
 
 ---
 

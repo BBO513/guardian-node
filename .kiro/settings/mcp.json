@@ -1,0 +1,48 @@
+{
+  "mcpServers": {
+    "guardian-node": {
+      "command": "python",
+      "args": [
+        "-m", "guardian_interpreter.mcp_server",
+        "--host", "localhost",
+        "--port", "8080",
+        "--privacy-mode", "strict"
+      ],
+      "cwd": "./guardian-node",
+      "env": {
+        "GUARDIAN_MODE": "mcp",
+        "GUARDIAN_OFFLINE": "true",
+        "GUARDIAN_PRIVACY_MODE": "strict",
+        "PYTHONPATH": "./guardian-node"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "guardian_status",
+        "family_skills_list",
+        "family_help",
+        "security_tips"
+      ]
+    },
+    "guardian-family-assistant": {
+      "command": "python",
+      "args": [
+        "-m", "guardian_interpreter.family_mcp_server",
+        "--family-mode", "true",
+        "--child-safe", "true"
+      ],
+      "cwd": "./guardian-node",
+      "env": {
+        "GUARDIAN_FAMILY_MODE": "true",
+        "GUARDIAN_CHILD_SAFE": "true",
+        "GUARDIAN_OFFLINE": "true"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "ask_family_question",
+        "get_family_recommendations",
+        "list_family_skills",
+        "family_security_tips"
+      ]
+    }
+  }
+}

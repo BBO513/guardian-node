@@ -9,11 +9,25 @@ requests>=2.25.0
 # LLM Integration (local inference)
 llama-cpp-python>=0.2.0
 
+# GUI dependencies
+PySide6>=6.0.0
+
 # Optional: For enhanced functionality
 ipaddress>=1.0.23
+
+# Family Assistant dependencies
+cryptography>=41.0.0
+
+# Voice interface dependencies (optional)
+speechrecognition>=3.10.0
+pyttsx3>=2.90
+pyaudio>=0.2.11
+sounddevice>=0.4.6
+
+# Monitoring dependencies
+prometheus-client>=0.14.0
 
 # Development dependencies (optional)
 # pytest>=7.0.0
 # black>=22.0.0
 # flake8>=4.0.0
-

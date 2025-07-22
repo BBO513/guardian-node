@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  guardian-node:
+    build: .
+    container_name: guardian-node-family-assistant
+    ports:
+      - "8000:8000"
+      - "8080:8080"  # GUI interface
+    volumes:
+      # Mount models directory for GGUF models
+      - ./models:/app/models:ro
+      # Mount data directory for family profiles and logs
+      - ./data:/app/data
+      # Mount logs directory
+      - ./logs:/app/logs
+    environment:
+      # LLM Model Configuration
+      - GUARDIAN_LLM_MODEL_PATH=/app/models/phi-3-mini-4k-instruct-q4.gguf
+      - GUARDIAN_MODELS_DIR=/app/models
+      
+      # Family Assistant Configuration
+      - GUARDIAN_MODE=family
+      - GUARDIAN_OFFLINE_MODE=true
+      - GUARDIAN_LOG_LEVEL=INFO
+      - GUARDIAN_HEALTH_PORT=8080
+      
+      # Security Configuration
+      - GUARDIAN_ENCRYPT_DATA=true
+      - GUARDIAN_AUDIT_LOGGING=true
+      
+      # Performance Configuration (Raspberry Pi optimized)
+      - GUARDIAN_MAX_MEMORY_MB=2048
+      - GUARDIAN_CPU_THREADS=4
+      - GUARDIAN_MODEL_CACHE_SIZE=512
+      
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    # Resource limits for Raspberry Pi
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '3.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # Optional: Monitoring service
+  guardian-monitor:
+    image: prom/prometheus:latest
+    container_name: guardian-monitor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    profiles:
+      - monitoring
+
+volumes:
+  guardian_data:
+    driver: local
+  guardian_logs:
+    driver: local
+
+networks:
+  default:
+    name: guardian-network

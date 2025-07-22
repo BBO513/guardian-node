@@ -1,490 +1,539 @@
-#!/usr/bin/env python3
-"""
-Guardian Interpreter - Local Modular AI Agent (Nodie Edition)
-Owner: Blackbox Matrix
-Status: Foundation Starter - BOBO
-
-A fully offline, modular AI agent framework for Raspberry Pi 5 (or PC)
-- No cloud, no telemetry, no default API calls
-- Local LLM via llama-cpp-python and GGUF models
-- Modular skill system for protocol modules
-- Hard-blocked internet by default
-- Full audit logging
-"""
-
-import os
 import sys
-import yaml
 import logging
-import importlib.util
-import traceback
-from datetime import datetime
+import yaml
+import os
 from pathlib import Path
-from typing import Dict, List, Any, Optional
 
-# Import LLM integration
-from llm_integration import create_llm
-from network_security import NetworkSecurityManager, AuditLogger
+# Import Guardian components
+try:
+    from guardian_interpreter.llm_integration import create_llm
+    from guardian_interpreter.network_security import NetworkSecurityManager, AuditLogger
+    from guardian_interpreter.family_assistant.family_assistant_manager import FamilyAssistantManager
+    from guardian_interpreter.family_assistant.skill_registry import FamilySkillRegistry
+    from guardian_interpreter.family_llm_prompts import FamilyContext, ChildSafetyLevel
+    from guardian_interpreter.skills import family_cyber_skills, threat_analysis_skill, device_guidance_skill, child_education_skill
+    
+    LLM_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Could not import Guardian components: {e}")
+    LLM_AVAILABLE = False
 
-class GuardianInterpreter:
-    """
-    Main Guardian Interpreter class
-    Handles configuration, logging, skill loading, and core functionality
-    """
-    
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = config_path
-        self.config = {}
-        self.skills = {}
-        self.logger = None
-        self.blocked_logger = None
-        self.llm = None
-        self.network_security = None
-        self.audit_logger = None
-        self.running = True
+class GuardianCLI:
+    def __init__(self):
+        self.logger = logging.getLogger('guardian')
+        self.config = self._load_config()
         
-        # Initialize the Guardian
-        self._load_config()
-        self._setup_logging()
-        self._setup_security_and_audit()
-        self._log_startup()
-        self._initialize_llm()
-        
-    def _load_config(self):
-        """Load configuration from YAML file"""
-        try:
-            with open(self.config_path, 'r') as f:
-                self.config = yaml.safe_load(f)
-            print(f"✓ Configuration loaded from {self.config_path}")
-        except FileNotFoundError:
-            print(f"✗ Configuration file {self.config_path} not found!")
-            sys.exit(1)
-        except yaml.YAMLError as e:
-            print(f"✗ Error parsing configuration: {e}")
-            sys.exit(1)
-    
-    def _setup_logging(self):
-        """Setup logging system with privacy-focused audit trail"""
-        log_config = self.config.get('logging', {})
-        
-        # Create logs directory if it doesn't exist
-        os.makedirs('logs', exist_ok=True)
-        
-        # Setup main logger
-        logging.basicConfig(
-            level=getattr(logging, log_config.get('level', 'INFO')),
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_config.get('main_log', 'logs/guardian.log')),
-                logging.StreamHandler()
-            ]
-        )
-        self.logger = logging.getLogger('Guardian')
-        
-        # Setup blocked calls logger
-        blocked_handler = logging.FileHandler(log_config.get('blocked_calls_log', 'logs/blocked_calls.log'))
-        blocked_handler.setFormatter(logging.Formatter('%(asctime)s - BLOCKED - %(message)s'))
-        self.blocked_logger = logging.getLogger('BlockedCalls')
-        self.blocked_logger.addHandler(blocked_handler)
-        self.blocked_logger.setLevel(logging.INFO)
-        
-        print("✓ Logging system initialized")
-    
-    def _setup_security_and_audit(self):
-        """Setup network security and audit logging"""
-        try:
-            # Initialize network security manager
-            self.network_security = NetworkSecurityManager(self.config, self.logger, self.blocked_logger)
+        # Initialize LLM
+        if LLM_AVAILABLE:
+            self.llm = create_llm(self.config, self.logger)
+            self.llm.load_model()
             
             # Initialize audit logger
             self.audit_logger = AuditLogger(self.config, self.logger)
             
-            print("✓ Security and audit systems initialized")
+            # Initialize family assistant manager
+            self.family_manager = FamilyAssistantManager(
+                config=self.config,
+                logger=self.logger,
+                audit_logger=self.audit_logger
+            )
             
-        except Exception as e:
-            print(f"⚠️  Security setup failed: {e}")
-            self.logger.error(f"Security setup error: {e}")
-    
-    def _log_startup(self):
-        """Log Guardian startup information"""
-        system_info = self.config.get('system', {})
-        self.logger.info("=" * 50)
-        self.logger.info(f"Guardian Interpreter Starting")
-        self.logger.info(f"Name: {system_info.get('name', 'Guardian Interpreter')}")
-        self.logger.info(f"Version: {system_info.get('version', '1.0.0')}")
-        self.logger.info(f"Owner: {system_info.get('owner', 'Blackbox Matrix')}")
-        self.logger.info(f"Online Mode: {self.config.get('network', {}).get('ALLOW_ONLINE', False)}")
-        self.logger.info("=" * 50)
-    
-    def _initialize_llm(self):
-        """Initialize the local LLM"""
-        try:
-            self.llm = create_llm(self.config, self.logger)
+            # Register family skills
+            self._register_family_skills()
             
-            # Try to load the model
-            llm_config = self.config.get('llm', {})
-            model_path = llm_config.get('model_path', 'models/your-model.gguf')
-            
-            if os.path.exists(model_path):
-                print("Loading LLM model... This may take a moment.")
-                if self.llm.load_model():
-                    print("✓ LLM model loaded successfully - Nodie is ready!")
-                else:
-                    print("✗ Failed to load LLM model - Nodie will use fallback responses")
-            else:
-                print(f"⚠️  LLM model not found at {model_path}")
-                print("   Add a GGUF model file to enable full AI functionality")
-                
-        except Exception as e:
-            self.logger.error(f"LLM initialization error: {e}")
-            print(f"⚠️  LLM initialization failed: {e}")
+            self.logger.info("Guardian CLI initialized with real LLM integration")
+        else:
+            self.family_manager = self._create_fallback_manager()
+            self.llm = None
+            self.audit_logger = None
+            self.logger.warning("Guardian CLI initialized with fallback manager")
     
-    def outbound_request(self, url: str, method: str = "GET", **kwargs) -> Optional[Any]:
-        """
-        Central function for all outbound network requests
-        Uses NetworkSecurityManager for enhanced blocking and logging
-        """
-        if not self.network_security:
-            self.logger.error("Network security manager not initialized")
-            return None
-        
-        # Check if request is allowed
-        if not self.network_security.is_request_allowed(url, method):
-            print(f"🚫 BLOCKED: Outbound request to {url}")
-            if self.audit_logger:
-                self.audit_logger.log_security_event(f"Blocked outbound request", {
-                    'url': url,
-                    'method': method
-                })
-            return None
-        
-        # If we get here, request is allowed
-        print(f"🌐 ALLOWED: Outbound request to {url}")
-        if self.audit_logger:
-            self.audit_logger.log_security_event(f"Allowed outbound request", {
-                'url': url,
-                'method': method
-            })
-        
-        # TODO: Implement actual request handling when online is enabled
-        # This would use requests library or similar
-        return None
-    
-    def load_skills(self):
-        """Load all skills from the skills directory"""
-        skills_config = self.config.get('skills', {})
-        if not skills_config.get('auto_load', True):
-            return
-        
-        skills_dir = skills_config.get('skills_directory', 'skills')
-        skills_path = Path(skills_dir)
-        
-        if not skills_path.exists():
-            self.logger.warning(f"Skills directory {skills_dir} not found")
-            return
-        
-        loaded_count = 0
-        for skill_file in skills_path.glob('*.py'):
-            if skill_file.name.startswith('__'):
-                continue  # Skip __init__.py and similar files
-            
+    def _load_config(self) -> dict:
+        """Load Guardian configuration"""
+        config_path = Path(__file__).parent / 'config.yaml'
+        if config_path.exists():
             try:
-                skill_name = skill_file.stem
-                spec = importlib.util.spec_from_file_location(skill_name, skill_file)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                
-                # Check if the skill has a 'run' function
-                if hasattr(module, 'run'):
-                    self.skills[skill_name] = module
-                    loaded_count += 1
-                    self.logger.info(f"Loaded skill: {skill_name}")
-                else:
-                    self.logger.warning(f"Skill {skill_name} missing 'run' function")
-                    
+                with open(config_path, 'r') as f:
+                    return yaml.safe_load(f)
             except Exception as e:
-                self.logger.error(f"Failed to load skill {skill_file}: {e}")
+                self.logger.error(f"Error loading config: {e}")
         
-        print(f"✓ Loaded {loaded_count} skills")
-        self.logger.info(f"Skills loading complete: {loaded_count} skills loaded")
+        # Default configuration
+        return {
+            'llm': {
+                'model_path': 'models/guardian-model.gguf',
+                'context_length': 4096,
+                'max_tokens': 512,
+                'temperature': 0.7,
+                'threads': 4
+            },
+            'family_assistant': {
+                'enabled': True,
+                'gui_enabled': True,
+                'default_interface': 'cli',
+                'family_data_path': 'data/families'
+            }
+        }
     
-    def list_skills(self):
-        """List all available skills"""
-        if not self.skills:
-            print("No skills loaded.")
-            return
-        
-        print("\nAvailable Skills:")
-        print("-" * 30)
-        for i, (name, module) in enumerate(self.skills.items(), 1):
-            description = getattr(module, '__doc__', 'No description available')
-            if description:
-                description = description.strip().split('\n')[0]  # First line only
-            print(f"{i:2d}. {name:<20} - {description}")
-        print()
-    
-    def run_skill(self, skill_identifier: str, *args, **kwargs):
-        """Run a skill by name or number"""
-        skill_module = None
-        skill_name = None
-        
-        # Try to get skill by number
-        if skill_identifier.isdigit():
-            skill_num = int(skill_identifier)
-            skill_names = list(self.skills.keys())
-            if 1 <= skill_num <= len(skill_names):
-                skill_name = skill_names[skill_num - 1]
-                skill_module = self.skills[skill_name]
-        
-        # Try to get skill by name
-        elif skill_identifier in self.skills:
-            skill_name = skill_identifier
-            skill_module = self.skills[skill_identifier]
-        
-        if not skill_module:
-            print(f"✗ Skill '{skill_identifier}' not found")
-            self.logger.warning(f"Attempted to run unknown skill: {skill_identifier}")
-            if self.audit_logger:
-                self.audit_logger.log_user_action(f"Failed skill execution", {
-                    'skill_identifier': skill_identifier,
-                    'reason': 'skill not found'
-                })
-            return
-        
+    def _register_family_skills(self):
+        """Register all family skills with the manager"""
         try:
-            self.logger.info(f"Executing skill: {skill_name} with args: {args}")
-            if self.audit_logger:
-                self.audit_logger.log_skill_execution(skill_name, list(args))
+            # Skills are already imported at module level
             
-            result = skill_module.run(*args, **kwargs)
-            print(f"✓ Skill '{skill_name}' completed")
-            if result:
-                print(f"Result: {result}")
-            self.logger.info(f"Skill {skill_name} completed successfully")
+            # Create skill wrapper class for compatibility
+            class SkillWrapper:
+                def __init__(self, skill_func, name):
+                    self.skill_func = skill_func
+                    self.name = name
+                
+                def run(self, *args, **kwargs):
+                    return self.skill_func(*args, **kwargs)
             
-            if self.audit_logger:
-                self.audit_logger.log_skill_execution(skill_name, list(args), str(result) if result else None)
+            # Register skills
+            self.family_manager.register_family_skill(
+                'family_cyber_skills', 
+                SkillWrapper(family_cyber_skills.run, 'family_cyber_skills')
+            )
+            self.family_manager.register_family_skill(
+                'threat_analysis_skill', 
+                SkillWrapper(threat_analysis_skill.run, 'threat_analysis_skill')
+            )
+            self.family_manager.register_family_skill(
+                'device_guidance_skill', 
+                SkillWrapper(device_guidance_skill.run, 'device_guidance_skill')
+            )
+            self.family_manager.register_family_skill(
+                'child_education_skill', 
+                SkillWrapper(child_education_skill.run, 'child_education_skill')
+            )
             
-            return result
+            self.logger.info("Family skills registered successfully")
+            
         except Exception as e:
-            error_msg = f"Error running skill '{skill_name}': {e}"
-            print(f"✗ {error_msg}")
-            self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
-            
-            if self.audit_logger:
-                self.audit_logger.log_security_event(f"Skill execution error", {
-                    'skill': skill_name,
-                    'error': str(e)
-                })
+            self.logger.error(f"Error registering family skills: {e}")
     
-    def show_help(self):
-        """Display help information"""
+    def _create_fallback_manager(self):
+        """Create fallback manager when LLM is not available"""
+        class FallbackFamilyManager:
+            def __init__(self):
+                self.family_skills = {
+                    'threat_analysis': lambda *a, **k: {'success': True, 'result': "Threat analysis not available - LLM required"},
+                    'device_guidance': lambda *a, **k: {'success': True, 'result': "Device guidance not available - LLM required"},
+                    'child_education': lambda *a, **k: {'success': True, 'result': "Child education not available - LLM required"}
+                }
+            
+            def process_family_query(self, query, context):
+                return {
+                    'response': f'Family assistant requires LLM integration. Your query: "{query}" cannot be processed without a loaded model.',
+                    'confidence': 0.0,
+                    'follow_up_questions': ['Please configure an LLM model to enable family assistance.']
+                }
+            
+            def run_family_skill(self, skill_name, *args):
+                return {'success': False, 'error': 'LLM integration required for family skills'}
+            
+            def analyze_family_security(self, profile):
+                class Result:
+                    status = 'unavailable'
+                    overall_score = 0.0
+                    findings = ['Family security analysis requires LLM integration']
+                    recommendations = []
+                return Result()
+            
+            def get_family_recommendations(self, profile):
+                return []
+        
+        return FallbackFamilyManager()
+    def show_family_help(self):
         help_text = """
-Guardian Interpreter - Local Modular AI Agent
-============================================
-
-Commands:
-  help                    - Show this help message
-  skills                  - List all available skills
-  skill <name/number>     - Run a specific skill
-  config                  - Show current configuration
-  status                  - Show system status
-  logs                    - Show recent log entries
-  nodie <prompt>          - Chat with the local AI (when LLM is loaded)
-  quit, exit              - Exit the Guardian
+Family Assistant Commands:
+========================
+  family skills                 - List available family cybersecurity skills
+  family skill <name>           - Run a specific family skill
+  family analyze                - Analyze family security posture
+  family recommendations        - Get personalized security recommendations
+  family status                 - Show family assistant status
+  ask <question>                - Ask a family cybersecurity question
 
 Examples:
-  skill 1                 - Run the first skill
-  skill example_skill     - Run skill by name
-  skill lan_scan 192.168.1.0/24  - Run skill with arguments
-  nodie "What's my network status?"  - Ask the AI
-
-Privacy Features:
-  • All network requests are blocked by default (ALLOW_ONLINE=False)
-  • All actions are logged to logs/guardian.log
-  • Blocked network attempts logged to logs/blocked_calls.log
-  • No telemetry, no auto-updates, no external APIs
+  family skills
+  family skill threat_analysis
+  ask "How can I keep my child safe online?"
+  family analyze
         """
         print(help_text)
-    
-    def show_config(self):
-        """Display current configuration (sanitized)"""
-        print("\nCurrent Configuration:")
-        print("-" * 30)
-        print(f"Online Mode: {self.config.get('network', {}).get('ALLOW_ONLINE', False)}")
-        print(f"Skills Auto-load: {self.config.get('skills', {}).get('auto_load', True)}")
-        print(f"Log Level: {self.config.get('logging', {}).get('level', 'INFO')}")
-        print(f"LLM Model: {self.config.get('llm', {}).get('model_path', 'Not configured')}")
+    def list_family_skills(self):
+        if not self.family_manager:
+            print("Family assistant not available.")
+            return
+        print("\nAvailable Family Skills:")
+        print("-" * 40)
+        skills = self.family_manager.family_skills
+        if not skills:
+            print("No family skills registered.")
+            return
+        for i, (name, skill) in enumerate(skills.items(), 1):
+            description = "Family cybersecurity skill"
+            print(f"{i:2d}. {name:<25} - {description}")
         print()
-    
-    def show_status(self):
-        """Display system status"""
-        print("\nGuardian Status:")
-        print("-" * 20)
-        print(f"Skills Loaded: {len(self.skills)}")
-        
-        # LLM Status
-        if self.llm:
-            llm_info = self.llm.get_model_info()
-            if llm_info['loaded']:
-                print(f"LLM Status: Loaded ({llm_info.get('model_path', 'Unknown')})")
+    def run_family_skill(self, skill_name, *args):
+        if not self.family_manager:
+            print("Family assistant not available.")
+            return
+        try:
+            # Check if family mode is enabled
+            if hasattr(self, 'config') and self.config.get('family_mode', False):
+                # Use enhanced family skill execution
+                result = self.family_manager.execute_skill(skill_name, *args)
+                print(f"✓ Family skill '{skill_name}' completed")
+                print(f"Result: {result}")
             else:
-                print(f"LLM Status: Not loaded")
-        else:
-            print(f"LLM Status: Not initialized")
-            
-        print(f"Online Mode: {'ENABLED' if self.config.get('network', {}).get('ALLOW_ONLINE', False) else 'BLOCKED'}")
-        print(f"Uptime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print()
-    
-    def show_recent_logs(self, lines: int = 10):
-        """Show recent log entries"""
-        log_file = self.config.get('logging', {}).get('main_log', 'logs/guardian.log')
-        try:
-            with open(log_file, 'r') as f:
-                log_lines = f.readlines()
-                recent_lines = log_lines[-lines:]
-                print(f"\nRecent Log Entries (last {lines} lines):")
-                print("-" * 40)
-                for line in recent_lines:
-                    print(line.strip())
-                print()
-        except FileNotFoundError:
-            print(f"Log file {log_file} not found")
-    
-    def chat_with_nodie(self, prompt: str):
-        """Chat with the local AI (Nodie)"""
-        self.logger.info(f"User prompt: {prompt}")
-        
-        if self.audit_logger:
-            self.audit_logger.log_llm_interaction(prompt)
-        
-        if not self.llm or not self.llm.is_loaded():
-            response = "Nodie is not available. Please configure a GGUF model in config.yaml and ensure llama-cpp-python is installed."
-            print(f"Nodie: {response}")
-            self.logger.info(f"Nodie response: {response}")
-            
-            if self.audit_logger:
-                self.audit_logger.log_llm_interaction(prompt, response)
-            
-            return response
-        
-        try:
-            # Generate response using the local LLM
-            response = self.llm.generate_response(prompt)
-            print(f"Nodie: {response}")
-            self.logger.info(f"Nodie response: {response}")
-            
-            if self.audit_logger:
-                self.audit_logger.log_llm_interaction(prompt, response)
-            
-            return response
-            
-        except Exception as e:
-            error_msg = f"Error communicating with Nodie: {e}"
-            print(f"Nodie: {error_msg}")
-            self.logger.error(error_msg)
-            
-            if self.audit_logger:
-                self.audit_logger.log_security_event("LLM interaction error", {
-                    'error': str(e),
-                    'prompt_length': len(prompt)
-                })
-            
-            return error_msg
-    
-    def run_cli(self):
-        """Main CLI loop"""
-        cli_config = self.config.get('cli', {})
-        prompt_prefix = cli_config.get('prompt_prefix', 'Guardian> ')
-        
-        # Show initial information
-        system_info = self.config.get('system', {})
-        print(f"\n{system_info.get('name', 'Guardian Interpreter')} v{system_info.get('version', '1.0.0')}")
-        print(f"Owner: {system_info.get('owner', 'Blackbox Matrix')}")
-        print("Type 'help' for commands, 'quit' to exit")
-        
-        if cli_config.get('show_skill_list_on_start', True):
-            self.list_skills()
-        
-        # Main command loop
-        while self.running:
-            try:
-                user_input = input(prompt_prefix).strip()
-                
-                if not user_input:
-                    continue
-                
-                # Log user input
-                self.logger.info(f"User input: {user_input}")
-                
-                # Parse command
-                parts = user_input.split()
-                command = parts[0].lower()
-                args = parts[1:] if len(parts) > 1 else []
-                
-                # Handle commands
-                if command in ['quit', 'exit']:
-                    self.running = False
-                    print("Goodbye!")
-                    self.logger.info("Guardian shutting down by user request")
-                
-                elif command == 'help':
-                    self.show_help()
-                
-                elif command == 'skills':
-                    self.list_skills()
-                
-                elif command == 'skill':
-                    if args:
-                        self.run_skill(args[0], *args[1:])
-                    else:
-                        print("Usage: skill <name/number> [arguments]")
-                
-                elif command == 'config':
-                    self.show_config()
-                
-                elif command == 'status':
-                    self.show_status()
-                
-                elif command == 'logs':
-                    lines = int(args[0]) if args and args[0].isdigit() else 10
-                    self.show_recent_logs(lines)
-                
-                elif command == 'nodie':
-                    if args:
-                        prompt = ' '.join(args)
-                        self.chat_with_nodie(prompt)
-                    else:
-                        print("Usage: nodie <your prompt>")
-                
+                # Use standard family skill execution
+                result = self.family_manager.run_family_skill(skill_name, *args)
+                if result.get('success'):
+                    print(f"✓ Family skill '{skill_name}' completed")
+                    skill_result = result.get('result')
+                    if skill_result:
+                        print(f"Result: {skill_result}")
                 else:
-                    print(f"Unknown command: {command}. Type 'help' for available commands.")
-                    self.logger.warning(f"Unknown command attempted: {command}")
+                    print(f"✗ Family skill '{skill_name}' failed: {result.get('error', 'Unknown error')}")
+        except Exception as e:
+            print(f"✗ Error running family skill '{skill_name}': {e}")
+            self.logger.error(f"Family skill execution error: {e}")
+    def analyze_family_security(self):
+        if not self.family_manager:
+            print("Family assistant not available.")
+            return
+        try:
+            default_profile = {
+                'family_id': 'guardian_family',
+                'family_name': 'Guardian Family',
+                'members': [{'name': 'Parent', 'age_group': 'adult', 'tech_skill_level': 'intermediate'}],
+                'devices': [],
+                'security_preferences': {'threat_tolerance': 'medium', 'auto_recommendations': True}
+            }
+            print("Analyzing family security posture...")
+            analysis = self.family_manager.analyze_family_security(default_profile)
+            print(f"\nFamily Security Analysis:")
+            print(f"Status: {analysis.status}")
+            print(f"Overall Score: {analysis.overall_score:.1f}/100")
+            if getattr(analysis, 'findings', None):
+                print(f"\nFindings:")
+                for finding in analysis.findings:
+                    print(f"  • {finding}")
+            if getattr(analysis, 'recommendations', None):
+                print(f"\nRecommendations:")
+                for i, rec in enumerate(analysis.recommendations[:5], 1):
+                    print(f"  {i}. {rec.title} (Priority: {rec.priority})")
+        except Exception as e:
+            print(f"✗ Error analyzing family security: {e}")
+            self.logger.error(f"Family security analysis error: {e}")
+    def get_family_recommendations(self):
+        if not self.family_manager:
+            print("Family assistant not available.")
+            return
+        try:
+            default_profile = {
+                'family_id': 'guardian_family',
+                'family_name': 'Guardian Family',
+                'members': [{'name': 'Parent', 'age_group': 'adult', 'tech_skill_level': 'intermediate'}],
+                'devices': [],
+                'security_preferences': {'threat_tolerance': 'medium', 'auto_recommendations': True}
+            }
+            print("Generating family security recommendations...")
+            recommendations = self.family_manager.get_family_recommendations(default_profile)
+            if recommendations:
+                print(f"\nFamily Security Recommendations:")
+                print("-" * 40)
+                for i, rec in enumerate(recommendations, 1):
+                    print(f"{i}. {rec.title}")
+                    print(f"   Priority: {rec.priority} | Difficulty: {rec.difficulty}")
+                    print(f"   {rec.description}\n")
+            else:
+                print("No recommendations available at this time.")
+        except Exception as e:
+            print(f"✗ Error getting family recommendations: {e}")
+            self.logger.error(f"Family recommendations error: {e}")
+    def show_family_status(self):
+        print("Family Assistant is running. All systems nominal.")
+    def process_family_query(self, query, subcommand=None, args=None):
+        if not self.family_manager:
+            print("Family assistant not available.")
+            return
+        try:
+            # Create family context
+            context = {
+                'family_profile': {
+                    'family_id': 'guardian_family', 
+                    'members': [{'age_group': 'adult', 'tech_skill_level': 'intermediate'}]
+                }
+            }
             
+            # Process query through family assistant manager
+            result = self.family_manager.process_family_query(query, context)
+            
+            # If LLM is available, enhance response with LLM-generated content
+            if self.llm and self.llm.is_loaded() and LLM_AVAILABLE:
+                enhanced_response = self._enhance_response_with_llm(query, result, context)
+                if enhanced_response:
+                    result['response'] = enhanced_response
+                    result['llm_enhanced'] = True
+            
+            print("\nFamily Assistant Response:")
+            print(result.get('response', 'No response available'))
+            
+            # Show confidence if available
+            confidence = result.get('confidence', 0)
+            if confidence > 0:
+                print(f"\nConfidence: {confidence:.2f}")
+            
+            # Show if response was LLM enhanced
+            if result.get('llm_enhanced'):
+                print("✨ Enhanced with AI reasoning")
+            
+            # Show follow-up questions
+            follow_ups = result.get('follow_up_questions', [])
+            if follow_ups:
+                print("\nFollow-up questions you might ask:")
+                for i, question in enumerate(follow_ups[:3], 1):
+                    print(f"  {i}. {question}")
+            
+            # Handle subcommands
+            if subcommand == 'analyze':
+                self.analyze_family_security()
+            elif subcommand == 'recommendations':
+                self.get_family_recommendations()
+            elif subcommand == 'status':
+                self.show_family_status()
+            elif args and len(args) > 1:
+                skill_name = args[1]
+                skill_args = args[2:] if len(args) > 2 else []
+                self.run_family_skill(skill_name, *skill_args)
+                
+        except Exception as e:
+            print(f"✗ Error processing family query: {e}")
+            self.logger.error(f"Family query processing error: {e}")
+    
+    def _enhance_response_with_llm(self, query: str, skill_result: dict, context: dict) -> str:
+        """Enhance skill response with LLM-generated family-friendly content"""
+        try:
+            # Determine family context for LLM prompting
+            family_context = FamilyContext.GENERAL
+            child_safe_mode = False
+            safety_level = ChildSafetyLevel.STANDARD
+            
+            # Detect context from query
+            query_lower = query.lower()
+            if any(word in query_lower for word in ['child', 'kid', 'young']):
+                family_context = FamilyContext.CHILD_EDUCATION
+                child_safe_mode = True
+                safety_level = ChildSafetyLevel.MODERATE
+            elif any(word in query_lower for word in ['threat', 'attack', 'danger']):
+                family_context = FamilyContext.THREAT_EXPLANATION
+            elif any(word in query_lower for word in ['device', 'phone', 'computer']):
+                family_context = FamilyContext.DEVICE_SECURITY
+            elif any(word in query_lower for word in ['parent', 'family']):
+                family_context = FamilyContext.PARENT_GUIDANCE
+            
+            # Create enhanced prompt combining skill result with user query
+            skill_response = skill_result.get('response', '')
+            enhancement_prompt = f"""
+Based on this cybersecurity question: "{query}"
+
+And this technical guidance: "{skill_response}"
+
+Please provide a comprehensive, family-friendly response that:
+1. Explains the cybersecurity concept in simple terms
+2. Provides practical steps the family can take
+3. Uses analogies that relate to everyday family life
+4. Prioritizes the most important actions first
+5. Encourages good cybersecurity habits
+
+Keep the response helpful, encouraging, and actionable for a family audience.
+"""
+            
+            # Generate enhanced response using family-friendly LLM prompts
+            enhanced_response = self.llm.generate_family_response(
+                enhancement_prompt,
+                context=family_context,
+                child_safe_mode=child_safe_mode,
+                safety_level=safety_level,
+                family_profile=context.get('family_profile')
+            )
+            
+            # Validate the enhanced response
+            if enhanced_response and len(enhanced_response.strip()) > 50:
+                return enhanced_response
+            else:
+                self.logger.warning("LLM enhancement produced insufficient response")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error enhancing response with LLM: {e}")
+            return None
+    def family_cli_loop(self):
+        print("Guardian Family Assistant CLI. Type 'help' for commands.")
+        while True:
+            try:
+                command = input("guardian-family> ").strip()
+                if not command:
+                    continue
+                if command in ['exit', 'quit']:
+                    break
+                if command == 'help':
+                    self.show_family_help()
+                    continue
+                parts = command.split()
+                if parts[0] == 'family':
+                    if len(parts) == 1 or parts[1] == 'help':
+                        self.show_family_help()
+                    elif parts[1] == 'skills':
+                        self.list_family_skills()
+                    elif parts[1] == 'skill':
+                        if len(parts) < 3:
+                            print("Usage: family skill <skill_name> [arguments]")
+                        else:
+                            skill_name = parts[2]
+                            skill_args = parts[3:] if len(parts) > 3 else []
+                            self.run_family_skill(skill_name, *skill_args)
+                    elif parts[1] == 'analyze':
+                        self.analyze_family_security()
+                    elif parts[1] == 'recommendations':
+                        self.get_family_recommendations()
+                    elif parts[1] == 'status':
+                        self.show_family_status()
+                    else:
+                        print("Unknown family subcommand.")
+                elif parts[0] == 'ask':
+                    query = command[len('ask '):].strip()
+                    self.process_family_query(query)
+                else:
+                    print("Unknown command.")
             except KeyboardInterrupt:
-                print("\nUse 'quit' to exit gracefully.")
-            except EOFError:
-                self.running = False
-                print("\nGoodbye!")
-                self.logger.info("Guardian shutting down (EOF)")
+                print("\nExiting.")
+                break
             except Exception as e:
                 print(f"Error: {e}")
-                self.logger.error(f"CLI error: {e}\n{traceback.format_exc()}")
 
 def main():
-    """Main entry point"""
-    print("Starting Guardian Interpreter...")
+    """Main entry point with argument parsing"""
+    import argparse
     
-    try:
-        guardian = GuardianInterpreter()
-        guardian.load_skills()
-        guardian.run_cli()
-    except Exception as e:
-        print(f"Fatal error: {e}")
-        logging.error(f"Fatal error: {e}\n{traceback.format_exc()}")
-        sys.exit(1)
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Guardian Node - Family Cybersecurity Assistant')
+    parser.add_argument('--gui', action='store_true', help='Launch GUI mode')
+    parser.add_argument('--mcp', action='store_true', help='Enable MCP server')
+    parser.add_argument('--family-mode', action='store_true', help='Enable family assistant mode')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    
+    args = parser.parse_args()
+    
+    # Set up logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Create Guardian CLI instance
+    cli = GuardianCLI()
+    
+    # Launch GUI if requested
+    if args.gui:
+        try:
+            from guardian_gui import create_guardian_gui
+            print("🖥️ Launching Guardian Node GUI...")
+            
+            # Create GUI application
+            app, window = create_guardian_gui(cli)
+            
+            # Set environment variables for GUI mode
+            import os
+            if args.family_mode:
+                os.environ['GUARDIAN_FAMILY_MODE'] = 'true'
+            if args.mcp:
+                os.environ['GUARDIAN_MCP_ENABLED'] = 'true'
+            
+            print("✓ GUI launched successfully")
+            print("   Use the mode buttons to switch between Adult/Teen/Kids modes")
+            print("   Click buttons to access family features and security tools")
+            
+            # Run GUI event loop
+            sys.exit(app.exec())
+            
+        except ImportError as e:
+            print(f"❌ GUI dependencies not available: {e}")
+            print("Install GUI dependencies: pip install PySide6")
+            print("Falling back to CLI mode...")
+            cli.family_cli_loop()
+        except Exception as e:
+            print(f"❌ Error launching GUI: {e}")
+            print("Falling back to CLI mode...")
+            cli.family_cli_loop()
+    else:
+        # Run CLI mode
+        print("🖥️ Starting Guardian Node CLI...")
+        if args.family_mode:
+            print("👨‍👩‍👧‍👦 Family assistant mode enabled")
+        if args.mcp:
+            print("🔌 MCP server mode enabled")
+        
+        cli.family_cli_loop()
+
+def main():
+    """Main entry point with argument parsing"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Guardian Node - Family Cybersecurity Assistant")
+    parser.add_argument('--gui', action='store_true', help='Launch GUI mode')
+    parser.add_argument('--mcp', action='store_true', help='Enable MCP server')
+    parser.add_argument('--family-mode', action='store_true', help='Enable family mode')
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    
+    print("🛡️ Starting Guardian Node...")
+    
+    if args.gui:
+        print("🖥️ Launching GUI mode...")
+        try:
+            from guardian_gui import create_guardian_gui
+            
+            # Create Guardian CLI instance for backend integration
+            guardian = GuardianCLI()
+            
+            # Set Raspberry Pi environment if on ARM
+            import platform
+            if platform.machine() in ['aarch64', 'armv7l']:
+                os.environ['RASPBERRY_PI'] = '1'
+            else:
+                os.environ['RASPBERRY_PI'] = '0'
+            
+            # Create and run GUI
+            app, window = create_guardian_gui(guardian)
+            print("✅ GUI launched successfully")
+            sys.exit(app.exec())
+            
+        except ImportError as e:
+            print(f"❌ GUI not available: {e}")
+            print("💡 Install PySide6: pip install PySide6")
+            print("🔄 Falling back to CLI mode...")
+            
+    # CLI mode (default)
+    print("💻 Running in CLI mode...")
+    cli = GuardianCLI()
+    
+    if args.mcp:
+        print("🔌 MCP server mode enabled")
+        # MCP integration would go here
+    
+    if args.family_mode:
+        print("👨‍👩‍👧‍👦 Family mode enabled")
+    
+    cli.family_cli_loop()
+
 
 if __name__ == "__main__":
     main()
-

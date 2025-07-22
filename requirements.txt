@@ -1,0 +1,8 @@
+llama-cpp-python>=0.2.72
+PySide6
+pyttsx3
+speechrecognition
+psutil
+matplotlib
+mcp-agent
+git-lfs
