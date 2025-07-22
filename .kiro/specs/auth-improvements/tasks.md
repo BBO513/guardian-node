@@ -18,27 +18,30 @@
 - [x] 2. Create authentication verification utilities
 
 
-  - [ ] 2.1 Implement auth_check.py utility
+  - [x] 2.1 Implement auth_check.py utility
+
+
+
     - Write Python script to verify authentication configuration
     - Add detection for password-based authentication
     - Include clear error messages and remediation steps
     - _Requirements: 1.1, 1.3, 3.1_
   
-  - [ ] 2.2 Create auth_compliance_check.sh script
+  - [x] 2.2 Create auth_compliance_check.sh script
     - Implement shell script to scan configuration files for password authentication
     - Add reporting functionality to identify non-compliant configurations
     - Ensure script works on both Windows and Unix-based systems
     - _Requirements: 3.1, 3.2_
 
 - [ ] 3. Update setup scripts to enforce secure authentication
-  - [ ] 3.1 Modify setup.sh for Unix-based systems
-    - Update script to configure Git for secure authentication
+  - [ ] 3.1 Create setup.sh for Unix-based systems
+    - Create script to configure Git for secure authentication
     - Add PAT configuration functionality
     - Add SSH key setup assistance
     - _Requirements: 1.1, 2.2, 4.1_
   
-  - [ ] 3.2 Modify setup.ps1 for Windows systems
-    - Update PowerShell script to configure Git for secure authentication
+  - [ ] 3.2 Create setup.ps1 for Windows systems
+    - Create PowerShell script to configure Git for secure authentication
     - Add PAT configuration functionality
     - Add SSH key setup assistance
     - _Requirements: 1.1, 2.2, 2.3, 4.1_
@@ -57,7 +60,7 @@
   - Ensure platform-specific instructions are clear
   - _Requirements: 2.1, 2.2, 2.3, 3.3_
 
-- [ ] 6. Update CONTRIBUTING.md with authentication requirements
+- [ ] 6. Create CONTRIBUTING.md with authentication requirements
   - Add section on required authentication methods
   - Include process for updating authentication credentials
   - Add links to detailed authentication guides
@@ -72,7 +75,7 @@
     - _Requirements: 3.2, 3.3_
   
   - [ ] 7.2 Add authentication verification to CI pipeline
-    - Update CI configuration to run authentication tests
+    - Create GitHub Actions workflow for authentication checks
     - Add compliance checks to prevent password authentication
     - Ensure CI pipeline validates all authentication methods
     - _Requirements: 3.1, 3.2_

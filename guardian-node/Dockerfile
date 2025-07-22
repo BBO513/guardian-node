@@ -14,7 +14,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY guardian_interpreter/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
@@ -33,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
   CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
 
 # Run the application
-CMD ["python3", "guardian_interpreter/main.py", "--mcp", "--family-mode"]
+CMD ["tail", "-f", "/dev/null"]
