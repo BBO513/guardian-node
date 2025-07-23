@@ -1,0 +1,29 @@
+2025-07-12 12:35:16,488 - Guardian - INFO - Network security manager initialized
+2025-07-12 12:35:16,488 - Guardian - INFO - Online mode: False
+2025-07-12 12:35:16,488 - Guardian - INFO - No allowed domains configured
+2025-07-12 12:35:16,488 - Audit - INFO - [SYSTEM] Audit logging initialized
+2025-07-12 12:35:16,489 - Guardian - INFO - ==================================================
+2025-07-12 12:35:16,489 - Guardian - INFO - Guardian Interpreter Starting
+2025-07-12 12:35:16,489 - Guardian - INFO - Name: Guardian Interpreter
+2025-07-12 12:35:16,489 - Guardian - INFO - Version: 1.0.0
+2025-07-12 12:35:16,489 - Guardian - INFO - Owner: Blackbox Matrix
+2025-07-12 12:35:16,489 - Guardian - INFO - Online Mode: False
+2025-07-12 12:35:16,489 - Guardian - INFO - ==================================================
+2025-07-12 12:35:16,490 - Guardian - INFO - Loaded skill: example_skill
+2025-07-12 12:35:16,497 - Guardian - INFO - Loaded skill: lan_scanner
+2025-07-12 12:35:16,500 - Guardian - ERROR - Failed to load skill skills/system_info.py: No module named 'psutil'
+2025-07-12 12:35:16,733 - Guardian - INFO - Loaded skill: router_checker
+2025-07-12 12:35:16,733 - Guardian - INFO - Skills loading complete: 3 skills loaded
+2025-07-12 12:35:51,099 - Guardian - INFO - User input: help
+2025-07-12 12:35:57,172 - Guardian - INFO - User input: skill 1 test argument
+2025-07-12 12:35:57,172 - Guardian - INFO - Executing skill: example_skill with args: ('test', 'argument')
+2025-07-12 12:35:57,172 - Audit - INFO - [SKILL] Executed skill: example_skill - Details: {'skill': 'example_skill', 'arguments': ['test', 'argument'], 'result_length': 0}
+2025-07-12 12:35:57,172 - Guardian - INFO - Skill example_skill completed successfully
+2025-07-12 12:35:57,172 - Audit - INFO - [SKILL] Executed skill: example_skill - Details: {'skill': 'example_skill', 'arguments': ['test', 'argument'], 'result_length': 53}
+2025-07-12 12:36:03,197 - Guardian - INFO - User input: nodie Hello Nodie, are you working?
+2025-07-12 12:36:03,197 - Guardian - INFO - User prompt: Hello Nodie, are you working?
+2025-07-12 12:36:03,197 - Audit - INFO - [LLM] AI interaction - Details: {'prompt_length': 29, 'response_length': 0}
+2025-07-12 12:36:03,197 - Guardian - INFO - Nodie response: Nodie is not available. Please configure a GGUF model in config.yaml and ensure llama-cpp-python is installed.
+2025-07-12 12:36:03,197 - Audit - INFO - [LLM] AI interaction - Details: {'prompt_length': 29, 'response_length': 110}
+2025-07-12 12:36:10,572 - Guardian - INFO - User input: quit
+2025-07-12 12:36:10,572 - Guardian - INFO - Guardian shutting down by user request

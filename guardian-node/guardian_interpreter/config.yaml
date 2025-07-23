@@ -1,0 +1,51 @@
+# Guardian Interpreter Configuration
+# Owner: Blackbox Matrix
+# Privacy-first, offline-by-default AI agent
+
+# LLM Configuration
+llm:
+  model_path: "models/phi-3-mini-4k-instruct-q4.gguf"
+  context_length: 4096
+  temperature: 0.7
+  max_tokens: 2048
+  threads: 4
+
+# Network Security Settings
+network:
+  ALLOW_ONLINE: false
+  allowed_domains: []
+  log_blocked_calls: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  main_log: "logs/guardian.log"
+  blocked_calls_log: "logs/blocked_calls.log"
+  max_log_size_mb: 10
+  backup_count: 5
+
+# Skills Configuration
+skills:
+  auto_load: true
+  skills_directory: "skills"
+  allow_system_calls: false
+
+# CLI Configuration
+cli:
+  prompt_prefix: "Guardian> "
+  show_skill_list_on_start: true
+  max_history: 100
+
+# Privacy Settings
+privacy:
+  no_telemetry: true
+  no_auto_updates: true
+  no_external_apis: true
+  audit_all_actions: true
+
+# System Information
+system:
+  name: "Guardian Interpreter"
+  version: "1.0.0"
+  owner: "Blackbox Matrix"
+  description: "Local Modular AI Agent (Nodie Edition)"
