@@ -16,4 +16,4 @@ jobs:
         with:
           python-version: '3.x'
       - name: Run auth check
-        run: python scripts/auth_check.py
+        run: python scripts/auth_check.py --ci

@@ -292,14 +292,15 @@ def main():
     parser = argparse.ArgumentParser(description='Verify authentication configuration for Guardian Node')
     parser.add_argument('--fix', action='store_true', help='Attempt to fix detected issues')
     parser.add_argument('--verbose', action='store_true', help='Show detailed information')
+    parser.add_argument('--ci', action='store_true', help='Run in non-interactive CI mode')
     args = parser.parse_args()
-    
+
     if args.verbose:
         logger.setLevel(logging.DEBUG)
-    
+
     print("Guardian Node Authentication Configuration Check")
     print("===============================================")
-    
+
     # Check Git installation
     try:
         git_version = subprocess.run(['git', '--version'], capture_output=True, text=True, check=True)
@@ -307,36 +308,36 @@ def main():
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.error("Git is not installed or not in PATH. Please install Git and try again.")
         sys.exit(1)
-    
+
     # Get Git configuration
     logger.debug("Checking local Git configuration...")
     local_config = get_git_config()
-    
+
     logger.debug("Checking global Git configuration...")
     global_config = get_git_config(global_config=True)
-    
+
     # Combine configurations (local overrides global)
     config = {**global_config, **local_config}
-    
+
     # Check for secure authentication methods
     detected_methods = check_auth_method(config)
-    
+
     print("\nDetected Authentication Methods:")
     if detected_methods:
         for method in detected_methods:
             print(f"✓ {AUTH_METHODS[method]['name']}")
     else:
         print("✗ No secure authentication methods detected")
-    
+
     # Check for password authentication
     logger.debug("Checking for password authentication...")
     issues = check_password_auth(config)
-    
+
     # Check for .git-credentials file
     logger.debug("Checking for .git-credentials file...")
     git_credentials_issues = check_git_credentials_file()
     issues.extend(git_credentials_issues)
-    
+
     # Display issues
     if issues:
         print("\nDetected Issues:")
@@ -346,48 +347,49 @@ def main():
             print(f"  Remediation: {issue['remediation']}")
             if 'file_path' in issue:
                 print(f"  File: {issue['file_path']}")
-        
+
         # Fix issues if requested
-        if args.fix:
+        if args.fix and not args.ci:
             print("\nAttempting to fix issues...")
             fixed, failed = fix_issues(issues, config)
-            
+
             if fixed:
                 print("\nFixed Issues:")
                 for fix in fixed:
                     print(f"✓ {fix}")
-            
+
             if failed:
                 print("\nIssues requiring manual intervention:")
                 for fail in failed:
                     print(f"✗ {fail}")
     else:
         print("\n✓ No authentication issues detected")
-    
+
     # Provide setup instructions if no secure methods detected
-    if not detected_methods:
+    if not detected_methods and not args.ci:
         print("\nRecommended Authentication Methods:")
         print("1. SSH Key (most secure, works offline)")
         print("2. Personal Access Token (easy to set up)")
         print("3. Passkey (convenient, requires compatible hardware)")
-        
+
         print("\nWould you like instructions for setting up a specific method? (1-3, or 'n' to skip)")
         choice = input("> ")
-        
+
         if choice == '1':
             print_auth_method_instructions('SSH')
         elif choice == '2':
             print_auth_method_instructions('PAT')
         elif choice == '3':
             print_auth_method_instructions('PASSKEY')
-    
+
     # Final recommendations
-    print("\nRecommendations:")
-    print("- Ensure you're using a secure authentication method (PAT, SSH, or Passkey)")
-    print("- Never store passwords in plain text or embed them in URLs")
-    print("- Use encrypted credential helpers when available")
-    print("- Regularly rotate your credentials for enhanced security")
-    
+    if not args.ci:
+        print("\nRecommendations:")
+        print("- Ensure you're using a secure authentication method (PAT, SSH, or Passkey)")
+        print("- Never store passwords in plain text or embed them in URLs")
+        print("- Use encrypted credential helpers when available")
+        print("- Regularly rotate your credentials for enhanced security")
+
     # Exit with appropriate status code
     if issues:
         sys.exit(1)
