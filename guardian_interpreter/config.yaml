@@ -1,164 +1,163 @@
-# Guardian Interpreter Configuration
-# Owner: Blackbox Matrix
-# Privacy-first, offline-by-default AI agent
+import yaml
+import re
+from pathlib import Path
+from typing import Dict, Any, List, Tuple, Union
 
-# LLM Configuration
-llm:
-  # Docker Model Runner (preferred for production)
-  docker_runner:
-    enabled: true
-    api_url: "http://localhost:8080"  # Docker Model Runner API endpoint
-    model_name: "guardian-node-llm:v1"  # Model name in Docker registry
+def validate_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    """
+    Validate Guardian Interpreter configuration
     
-  # Multiple GGUF Models Configuration (direct loading fallback)
-  models:
-    default:
-      path: "models/phi-3-mini-4k-instruct-q4.gguf"
-      context_length: 4096
-      temperature: 0.7
-      max_tokens: 512
-      threads: 4
-      age_groups: ["adult", "teen", "child"]
-      contexts: ["general", "security", "education", "threat_analysis"]
-      description: "General purpose family cybersecurity model"
-      
-    child_safe:
-      path: "models/phi-3-mini-child-safe-q4.gguf"  # Optional specialized model
-      context_length: 2048
-      temperature: 0.5  # Lower temperature for more consistent child-safe responses
-      max_tokens: 256
-      threads: 2
-      age_groups: ["child"]
-      contexts: ["education", "child_safety"]
-      description: "Child-safe educational model with strict content filtering"
-      
-    security_expert:
-      path: "models/llama-3.2-3b-security-q4.gguf"  # Optional security-focused model
-      context_length: 8192
-      temperature: 0.3  # Lower temperature for more precise security analysis
-      max_tokens: 1024
-      threads: 4
-      age_groups: ["adult"]
-      contexts: ["security", "threat_analysis", "device_guidance"]
-      description: "Security-focused model for detailed threat analysis"
-  
-  # Legacy single model path (for backward compatibility)
-  model_path: "models/your-model.gguf"
-  
-  # Common LLM settings (used as defaults)
-  context_length: 4096
-  temperature: 0.7
-  max_tokens: 512
-  threads: 4  # CPU threads for inference (direct mode only)
-
-# Network Security Settings
-network:
-  ALLOW_ONLINE: false  # HARD BLOCK internet by default - owner must explicitly enable
-  allowed_domains: []  # Whitelist of domains when online is enabled
-  log_blocked_calls: true  # Log all blocked outbound requests
-
-# Logging Configuration
-logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
-  main_log: "logs/guardian.log"
-  blocked_calls_log: "logs/blocked_calls.log"
-  max_log_size_mb: 10
-  backup_count: 5
-
-# Skills Configuration
-skills:
-  auto_load: true  # Automatically load all skills from skills/ directory
-  skills_directory: "skills"
-  allow_system_calls: false  # Restrict skills from making system calls by default
-
-# CLI Configuration
-cli:
-  prompt_prefix: "Guardian> "
-  show_skill_list_on_start: true
-  max_history: 100
-
-# Privacy Settings
-privacy:
-  no_telemetry: true
-  no_auto_updates: true
-  no_external_apis: true
-  audit_all_actions: true
-
-# Family Assistant Configuration
-family_assistant:
-  enabled: true
-  gui_enabled: true
-  default_interface: "gui"  # "gui" or "cli"
-  family_data_path: "data/families"
-  
-  # Family-specific LLM settings
-  family_llm:
-    system_prompt_template: "family_assistant_prompt.txt"
-    max_response_length: 1000
-    child_safe_mode: true
-    default_safety_level: "standard"  # "strict", "moderate", "standard"
+    Args:
+        config: Parsed YAML configuration as a dictionary
+        
+    Returns:
+        Tuple: (is_valid, error_messages)
+    """
+    errors = []
+    valid = True
     
-  # GUI Configuration
-  gui:
-    theme: "family_friendly"
-    font_size: "large"
-    high_contrast: false
-    touch_interface: true
-    screen_timeout: 300  # seconds
+    # Helper function to collect errors
+    def add_error(msg: str):
+        nonlocal valid, errors
+        valid = False
+        errors.append(msg)
     
-  # Family Skills Configuration
-  family_skills:
-    threat_analysis_enabled: true
-    device_guidance_enabled: true
-    child_education_enabled: true
-    auto_recommendations: true
+    # 1. Validate LLM Configuration
+    llm = config.get("llm", {})
+    if not llm:
+        add_error("Missing 'llm' configuration section")
+    else:
+        # Validate Docker runner configuration
+        docker_runner = llm.get("docker_runner", {})
+        if docker_runner.get("enabled", False):
+            if not docker_runner.get("api_url"):
+                add_error("Docker runner enabled but missing 'api_url'")
+            if not docker_runner.get("model_name"):
+                add_error("Docker runner enabled but missing 'model_name'")
+        
+        # Validate models configuration
+        models = llm.get("models", {})
+        if not models and not docker_runner.get("enabled", False):
+            add_error("No LLM models defined and Docker runner disabled")
+        
+        for model_name, model_cfg in models.items():
+            if not model_cfg.get("path"):
+                add_error(f"Model '{model_name}' missing 'path' configuration")
+            
+            age_groups = model_cfg.get("age_groups", [])
+            for group in age_groups:
+                if group not in ["adult", "teen", "child"]:
+                    add_error(f"Model '{model_name}' has invalid age group: {group}")
+            
+            contexts = model_cfg.get("contexts", [])
+            valid_contexts = ["general", "security", "education", "threat_analysis", 
+                             "child_safety", "device_guidance"]
+            for ctx in contexts:
+                if ctx not in valid_contexts:
+                    add_error(f"Model '{model_name}' has invalid context: {ctx}")
     
-  # Performance Settings
-  performance:
-    cache_responses: true
-    cache_size_mb: 50
-    background_analysis: false
-    priority_family_queries: true
+    # 2. Validate Network Settings
+    network = config.get("network", {})
+    if not network:
+        add_error("Missing 'network' configuration section")
+    else:
+        if "ALLOW_ONLINE" not in network:
+            add_error("Missing 'ALLOW_ONLINE' in network configuration")
+        
+        if network.get("ALLOW_ONLINE", False) and not isinstance(network.get("allowed_domains", []), list):
+            add_error("'allowed_domains' must be a list when online access is enabled")
     
-  # Voice Interface Configuration
-  voice_interface:
-    enabled: true
-    wake_word: "guardian"
-    session_timeout: 30  # seconds
-    max_retries: 3
-    privacy_mode: true
-    require_confirmation: true
+    # 3. Validate Logging Configuration
+    logging_cfg = config.get("logging", {})
+    if not logging_cfg:
+        add_error("Missing 'logging' configuration section")
+    else:
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR"]
+        if logging_cfg.get("level", "INFO") not in valid_levels:
+            add_error(f"Invalid logging level: {logging_cfg.get('level')}")
+        
+        if not logging_cfg.get("main_log"):
+            add_error("Missing 'main_log' path in logging configuration")
     
-  # Voice Input Settings
-  voice_input:
-    timeout: 5  # seconds
-    phrase_timeout: 1  # seconds
-    energy_threshold: 300
-    offline_mode: true
-    block_online: true  # Block online speech recognition for privacy
-    privacy_mode: true
-    log_audio: false
+    # 4. Validate Family Assistant Configuration
+    family = config.get("family_assistant", {})
+    if family.get("enabled", False):
+        # Validate safety level
+        safety_level = family.get("family_llm", {}).get("default_safety_level", "standard")
+        if safety_level not in ["strict", "moderate", "standard"]:
+            add_error(f"Invalid safety level: {safety_level}")
+        
+        # Validate GUI settings
+        gui = family.get("gui", {})
+        if family.get("gui_enabled", False):
+            if gui.get("theme") not in ["family_friendly", "professional", "high_contrast"]:
+                add_error(f"Invalid GUI theme: {gui.get('theme')}")
+            
+            if gui.get("font_size") not in ["small", "medium", "large"]:
+                add_error(f"Invalid font size: {gui.get('font_size')}")
+        
+        # Validate voice settings
+        voice = family.get("voice_interface", {})
+        if voice.get("enabled", False):
+            if not voice.get("wake_word"):
+                add_error("Voice interface enabled but missing 'wake_word'")
+            
+            if voice.get("session_timeout", 0) <= 0:
+                add_error("Voice session timeout must be positive")
     
-  # Voice Output Settings
-  voice_output:
-    speech_rate: 150  # words per minute
-    volume: 0.8  # 0.0 to 1.0
-    family_mode: true
-    child_friendly_voice: true
-    log_speech: false
+    # 5. Validate System Information
+    system_info = config.get("system", {})
+    required_system_fields = ["name", "version", "owner", "description"]
+    for field in required_system_fields:
+        if not system_info.get(field):
+            add_error(f"Missing required system field: {field}")
+    
+    # Validate version format (semantic versioning)
+    if system_info.get("version") and not re.match(r"^\d+\.\d+\.\d+$", system_info["version"]):
+        add_error(f"Invalid version format: {system_info['version']}. Use semantic versioning (e.g., 1.0.0)")
+    
+    return valid, errors
 
-# Protocol Modules Configuration
-protocol_modules:
-  enabled: true
-  modules_directory: "protocols"
-  auto_load_family_protocols: true
-  family_friendly_mode: true
-  max_analysis_results: 1000
+def load_and_validate_config(file_path: Union[str, Path]) -> Tuple[bool, Dict[str, Any], List[str]]:
+    """
+    Load and validate configuration file
+    
+    Args:
+        file_path: Path to YAML configuration file
+        
+    Returns:
+        Tuple: (is_valid, config_data, error_messages)
+    """
+    try:
+        with open(file_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        is_valid, errors = validate_config(config)
+        return is_valid, config, errors
+    except yaml.YAMLError as e:
+        return False, {}, [f"YAML parsing error: {str(e)}"]
+    except Exception as e:
+        return False, {}, [f"Error loading configuration: {str(e)}"]
 
-# System Information
-system:
-  name: "Guardian Interpreter"
-  version: "1.0.0"
-  owner: "Blackbox Matrix"
-  description: "Local Modular AI Agent (Nodie Edition)"
-
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) != 2:
+        print("Usage: python config_validator.py <config_file.yaml>")
+        sys.exit(1)
+    
+    config_file = sys.argv[1]
+    if not Path(config_file).exists():
+        print(f"Error: Configuration file not found: {config_file}")
+        sys.exit(1)
+    
+    valid, config, errors = load_and_validate_config(config_file)
+    
+    if valid:
+        print("✅ Configuration is valid")
+        print(f"System: {config.get('system', {}).get('name')} v{config.get('system', {}).get('version')}")
+    else:
+        print("❌ Configuration validation failed:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)

@@ -1,0 +1,10 @@
+2025-07-23 02:16:46,794 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-23 02:16:46,797 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'family_cyber_skills'}
+2025-07-23 02:16:46,797 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'threat_analysis_skill'}
+2025-07-23 02:16:46,798 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'device_guidance_skill'}
+2025-07-23 02:16:46,798 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'child_education_skill'}
+2025-07-23 04:14:55,034 - AUDIT - INFO - [SYSTEM] Audit logging initialized
+2025-07-23 04:14:55,036 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'family_cyber_skills'}
+2025-07-23 04:14:55,037 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'threat_analysis_skill'}
+2025-07-23 04:14:55,037 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'device_guidance_skill'}
+2025-07-23 04:14:55,037 - AUDIT - INFO - [SYSTEM] Family skill registered - Details: {'skill_name': 'child_education_skill'}

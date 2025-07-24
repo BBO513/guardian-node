@@ -1,0 +1,17 @@
+version: "3"
+services:
+  guardian-node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        - TARGETPLATFORM=linux/amd64  # x86_64 for WSL2
+    volumes:
+      - ..:/app
+    ports:
+      - "8080:8080"  # MCP port
+    environment:
+      - GUARDIAN_OFFLINE_MODE=1
+    command: ["python3", "guardian_interpreter/main.py", "--mcp", "--family-mode"]
+    platform: linux/amd64  # Match WSL2
+    working_dir: /app

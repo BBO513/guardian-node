@@ -1,8 +1,6 @@
-"""
-LLM Integration Module for Guardian Interpreter
-Handles local LLM loading and inference using llama-cpp-python and GGUF models.
-Completely offline operation with no external API calls.
-"""
+# LLM Integration Module for Guardian Interpreter
+# Handles local LLM loading and inference using llama-cpp-python and GGUF models.
+# Completely offline operation with no external API calls.
 
 import os
 import logging
@@ -25,58 +23,137 @@ class GuardianLLM:
         self.models = config.get('llm', {}).get('models', {})
         self.current_model = None
         self.logger = logger
+        self.llm = None
+        self.model_loaded = False
+        self.model_path = None
         self.load_default_model()
-    
-    def load_default_model(self):
-        """Load the default GGUF model"""
-        default_path = self.models.get('default', 'models/your-model.gguf')
-        if os.path.exists(default_path):
-            self.current_model = Llama(default_path, n_ctx=4096, n_threads=4)
-            self.logger.info("Loaded default GGUF model")
-    
-    def switch_model(self, context):
-        """
-        Switch to the appropriate model based on context
-        
-        Args:
-            context: Dictionary containing age_group and other context
-        """
-        age_group = context.get('age_group', 'adult')
-        model_path = self.models.get(age_group, self.models.get('default'))
-        if model_path and os.path.exists(model_path):
-            self.current_model = Llama(model_path, n_ctx=4096, n_threads=4)
-            self.logger.info(f"Switched to {age_group} model")
-        else:
-            self.logger.warning(f"No model for {age_group} - using default")
-    
-    def generate_response(self, prompt, system_prompt=None):
-        """
-        Generate a response using the loaded LLM
-        
-        Args:
-            prompt: User input prompt
-            system_prompt: Optional system prompt for context
-            
-        Returns:
-            str: Generated response
-        """
-        # Add fallback mechanism
+
+    def load_default_model(self) -> bool:
+        if not LLAMA_CPP_AVAILABLE:
+            self.logger.error("llama-cpp-python not available. Install with: pip install llama-cpp-python")
+            return False
+
+        llm_config = self.config.get('llm', {})
+        self.model_path = llm_config.get('model_path', '/mnt/c/Users/works/Desktop/Offline AI Cyber Sec/guardian_interpreter_v1.0.0/guardian_interpreter/models/Phi-3-mini-4k-instruct-q4.gguf')
+
+        if not os.path.exists(self.model_path):
+            self.logger.error(f"Model file not found: {self.model_path}")
+            return False
+
         try:
-            # Generate response
-            response = self.current_model(prompt, max_tokens=512)
-            return response['choices'][0]['text'].strip()
-        except:
-            return "Fallback: Model unavailable - please check setup."
+            self.logger.info(f"Loading LLM model: {self.model_path}")
+            self.llm = Llama(
+                model_path=self.model_path,
+                n_ctx=llm_config.get('context_length', 4096),
+                n_threads=llm_config.get('threads', 4),
+                verbose=False
+            )
+            self.model_loaded = True
+            self.logger.info("LLM model loaded successfully")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to load LLM model: {e}")
+            self.model_loaded = False
+            return False
+
+    def is_loaded(self) -> bool:
+        return self.model_loaded and self.llm is not None
+
+    def generate_response(self, prompt: str, system_prompt: str = None) -> str:
+        if not self.is_loaded():
+            return "Error: LLM model not loaded. Please check configuration and model file."
+
+        try:
+            llm_config = self.config.get('llm', {})
+            full_prompt = self._prepare_prompt(prompt, system_prompt)
+            self.logger.info(f"Generating response for prompt: {prompt[:100]}...")
+            response = self.llm(
+                full_prompt,
+                max_tokens=llm_config.get('max_tokens', 512),
+                temperature=llm_config.get('temperature', 0.7),
+                stop=["Human:", "User:", "\n\n"],
+                echo=False
+            )
+            generated_text = response['choices'][0]['text'].strip()
+            self.logger.info(f"Generated response: {generated_text[:100]}...")
+            return generated_text
+        except Exception as e:
+            error_msg = f"Error generating response: {e}"
+            self.logger.error(error_msg)
+            return error_msg
+
+    def _prepare_prompt(self, user_prompt: str, system_prompt: str = None) -> str:
+        if system_prompt:
+            return f"System: {system_prompt}\n\nHuman: {user_prompt}\n\nAssistant:"
+        else:
+            default_system = (
+                "You are Nodie, the Guardian AI assistant. You are running locally on a Guardian Node "
+                "for network security and system monitoring. You help with network analysis, security "
+                "assessment, and system administration. You are privacy-focused and operate completely "
+                "offline. Be helpful, concise, and security-conscious in your responses."
+            )
+            return f"System: {default_system}\n\nHuman: {user_prompt}\n\nAssistant:"
+
+    def get_model_info(self) -> Dict[str, Any]:
+        info = {
+            'loaded': self.model_loaded,
+            'model_path': self.model_path,
+            'available': LLAMA_CPP_AVAILABLE
+        }
+        if self.is_loaded():
+            llm_config = self.config.get('llm', {})
+            info.update({
+                'context_length': llm_config.get('context_length', 4096),
+                'temperature': llm_config.get('temperature', 0.7),
+                'max_tokens': llm_config.get('max_tokens', 512),
+                'threads': llm_config.get('threads', 4)
+            })
+        return info
+
+    def unload_model(self):
+        if self.llm:
+            del self.llm
+            self.llm = None
+            self.model_loaded = False
+            self.logger.info("LLM model unloaded")
+
+class MockLLM:
+    def __init__(self, config: Dict[str, Any], logger: logging.Logger):
+        self.config = config
+        self.logger = logger
+        self.model_loaded = False
+
+    def load_model(self) -> bool:
+        self.logger.warning("Using mock LLM - llama-cpp-python not available")
+        self.model_loaded = True
+        return True
+
+    def is_loaded(self) -> bool:
+        return self.model_loaded
+
+    def generate_response(self, prompt: str, system_prompt: str = None) -> str:
+        responses = [
+            f"Mock Nodie response to: '{prompt}'. Install llama-cpp-python and add a GGUF model for real AI responses.",
+            f"I'm a placeholder AI. Your prompt was: '{prompt}'. Configure a real GGUF model to enable full functionality.",
+            f"Guardian mock mode active. Received: '{prompt}'. Add llama-cpp-python and a model file to activate real AI."
+        ]
+        response_index = hash(prompt) % len(responses)
+        return responses[response_index]
+
+    def get_model_info(self) -> Dict[str, Any]:
+        return {
+            'loaded': True,
+            'model_path': 'Mock LLM',
+            'available': False,
+            'note': 'Install llama-cpp-python for real LLM functionality'
+        }
+
+    def unload_model(self):
+        self.model_loaded = False
 
 def create_llm(config: Dict[str, Any], logger: logging.Logger) -> GuardianLLM:
-    """
-    Factory function to create LLM instance
-    
-    Args:
-        config: Guardian configuration
-        logger: Logger instance
-        
-    Returns:
-        GuardianLLM instance
-    """
-    return GuardianLLM(config, logger)
+    if LLAMA_CPP_AVAILABLE:
+        return GuardianLLM(config, logger)
+    else:
+        return MockLLM(config, logger)
+             
