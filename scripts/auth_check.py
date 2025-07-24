@@ -86,7 +86,15 @@ def get_git_config(global_config=False):
         if global_config:
             cmd.append('--global')
         
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            if global_config:
+                logger.warning("Could not read global Git configuration. This is expected in some environments (like CI).")
+            else:
+                logger.error(f"Failed to get local Git configuration: {result.stderr}")
+            return {}
+            
         config = {}
         
         for line in result.stdout.splitlines():
@@ -95,8 +103,8 @@ def get_git_config(global_config=False):
                 config[key.strip()] = value.strip()
         
         return config
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to get Git configuration: {e}")
+    except FileNotFoundError:
+        logger.error("Git is not installed or not in PATH.")
         return {}
 
 def check_auth_method(config):
@@ -337,6 +345,16 @@ def main():
     logger.debug("Checking for .git-credentials file...")
     git_credentials_issues = check_git_credentials_file()
     issues.extend(git_credentials_issues)
+
+    # In CI mode, we don't want to fail if no auth method is found on the runner.
+    # We only care about issues that indicate credentials might be checked into the repo.
+    if args.ci:
+        ci_issues = []
+        for issue in issues:
+            # Filter out the issue about no secure auth method
+            if issue['message'] != 'No secure authentication method detected':
+                ci_issues.append(issue)
+        issues = ci_issues
 
     # Display issues
     if issues:
