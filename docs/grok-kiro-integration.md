@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Grok + Kiro Integration Guide
 
 **Connect Grok AI to Guardian Node via Kiro IDE**
@@ -1006,6 +1005,3 @@ docker-compose restart guardian-node
 ```
 
 **Remember: Guardian Node keeps your family's cybersecurity conversations completely private and offline! 🏠🔒**
-=======
-# grok-kiro-integration.md expanded guide...
->>>>>>> a0d2c75a88747ce742b9ef6cc664642fcb07ac5e

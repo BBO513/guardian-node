@@ -1,163 +1,157 @@
-import yaml
-import re
-from pathlib import Path
-from typing import Dict, Any, List, Tuple, Union
+# Guardian Interpreter Configuration
+# This is the main configuration file for Guardian Node family cybersecurity system
 
-def validate_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    """
-    Validate Guardian Interpreter configuration
-    
-    Args:
-        config: Parsed YAML configuration as a dictionary
-        
-    Returns:
-        Tuple: (is_valid, error_messages)
-    """
-    errors = []
-    valid = True
-    
-    # Helper function to collect errors
-    def add_error(msg: str):
-        nonlocal valid, errors
-        valid = False
-        errors.append(msg)
-    
-    # 1. Validate LLM Configuration
-    llm = config.get("llm", {})
-    if not llm:
-        add_error("Missing 'llm' configuration section")
-    else:
-        # Validate Docker runner configuration
-        docker_runner = llm.get("docker_runner", {})
-        if docker_runner.get("enabled", False):
-            if not docker_runner.get("api_url"):
-                add_error("Docker runner enabled but missing 'api_url'")
-            if not docker_runner.get("model_name"):
-                add_error("Docker runner enabled but missing 'model_name'")
-        
-        # Validate models configuration
-        models = llm.get("models", {})
-        if not models and not docker_runner.get("enabled", False):
-            add_error("No LLM models defined and Docker runner disabled")
-        
-        for model_name, model_cfg in models.items():
-            if not model_cfg.get("path"):
-                add_error(f"Model '{model_name}' missing 'path' configuration")
-            
-            age_groups = model_cfg.get("age_groups", [])
-            for group in age_groups:
-                if group not in ["adult", "teen", "child"]:
-                    add_error(f"Model '{model_name}' has invalid age group: {group}")
-            
-            contexts = model_cfg.get("contexts", [])
-            valid_contexts = ["general", "security", "education", "threat_analysis", 
-                             "child_safety", "device_guidance"]
-            for ctx in contexts:
-                if ctx not in valid_contexts:
-                    add_error(f"Model '{model_name}' has invalid context: {ctx}")
-    
-    # 2. Validate Network Settings
-    network = config.get("network", {})
-    if not network:
-        add_error("Missing 'network' configuration section")
-    else:
-        if "ALLOW_ONLINE" not in network:
-            add_error("Missing 'ALLOW_ONLINE' in network configuration")
-        
-        if network.get("ALLOW_ONLINE", False) and not isinstance(network.get("allowed_domains", []), list):
-            add_error("'allowed_domains' must be a list when online access is enabled")
-    
-    # 3. Validate Logging Configuration
-    logging_cfg = config.get("logging", {})
-    if not logging_cfg:
-        add_error("Missing 'logging' configuration section")
-    else:
-        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR"]
-        if logging_cfg.get("level", "INFO") not in valid_levels:
-            add_error(f"Invalid logging level: {logging_cfg.get('level')}")
-        
-        if not logging_cfg.get("main_log"):
-            add_error("Missing 'main_log' path in logging configuration")
-    
-    # 4. Validate Family Assistant Configuration
-    family = config.get("family_assistant", {})
-    if family.get("enabled", False):
-        # Validate safety level
-        safety_level = family.get("family_llm", {}).get("default_safety_level", "standard")
-        if safety_level not in ["strict", "moderate", "standard"]:
-            add_error(f"Invalid safety level: {safety_level}")
-        
-        # Validate GUI settings
-        gui = family.get("gui", {})
-        if family.get("gui_enabled", False):
-            if gui.get("theme") not in ["family_friendly", "professional", "high_contrast"]:
-                add_error(f"Invalid GUI theme: {gui.get('theme')}")
-            
-            if gui.get("font_size") not in ["small", "medium", "large"]:
-                add_error(f"Invalid font size: {gui.get('font_size')}")
-        
-        # Validate voice settings
-        voice = family.get("voice_interface", {})
-        if voice.get("enabled", False):
-            if not voice.get("wake_word"):
-                add_error("Voice interface enabled but missing 'wake_word'")
-            
-            if voice.get("session_timeout", 0) <= 0:
-                add_error("Voice session timeout must be positive")
-    
-    # 5. Validate System Information
-    system_info = config.get("system", {})
-    required_system_fields = ["name", "version", "owner", "description"]
-    for field in required_system_fields:
-        if not system_info.get(field):
-            add_error(f"Missing required system field: {field}")
-    
-    # Validate version format (semantic versioning)
-    if system_info.get("version") and not re.match(r"^\d+\.\d+\.\d+$", system_info["version"]):
-        add_error(f"Invalid version format: {system_info['version']}. Use semantic versioning (e.g., 1.0.0)")
-    
-    return valid, errors
+# System Information
+system:
+  name: "Guardian Node"
+  version: "1.0.0"
+  owner: "Family"
+  description: "Local AI-powered family cybersecurity assistant"
 
-def load_and_validate_config(file_path: Union[str, Path]) -> Tuple[bool, Dict[str, Any], List[str]]:
-    """
-    Load and validate configuration file
+# LLM (Language Model) Configuration
+llm:
+  # Docker-based LLM runner (for containerized deployments)
+  docker_runner:
+    enabled: false
+    api_url: "http://localhost:8000"
+    model_name: "phi-3-mini"
+  
+  # Local LLM models configuration
+  # TODO: Download models and place them in the models/ directory
+  # Models can be obtained from HuggingFace or similar sources
+  models:
+    default:
+      path: "models/Phi-3-mini-4k-instruct-q4.gguf"
+      context_length: 4096
+      threads: 4
+      age_groups: ["adult", "teen", "child"]
+      contexts: ["general", "security", "education"]
     
-    Args:
-        file_path: Path to YAML configuration file
-        
-    Returns:
-        Tuple: (is_valid, config_data, error_messages)
-    """
-    try:
-        with open(file_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        is_valid, errors = validate_config(config)
-        return is_valid, config, errors
-    except yaml.YAMLError as e:
-        return False, {}, [f"YAML parsing error: {str(e)}"]
-    except Exception as e:
-        return False, {}, [f"Error loading configuration: {str(e)}"]
+    security_expert:
+      path: "models/mistral-7b-security-q4.gguf"
+      context_length: 8192
+      threads: 4
+      age_groups: ["adult"]
+      contexts: ["security", "threat_analysis"]
+    
+    family_assistant:
+      path: "models/Phi-3-mini-4k-instruct-q4.gguf"
+      context_length: 4096
+      threads: 4
+      age_groups: ["child", "teen"]
+      contexts: ["education", "child_safety", "device_guidance"]
 
-if __name__ == "__main__":
-    import sys
+# Network Configuration
+network:
+  # Privacy-first: Disable online access by default
+  ALLOW_ONLINE: false
+  
+  # Allowed domains (if ALLOW_ONLINE is true)
+  allowed_domains:
+    - "localhost"
+    - "127.0.0.1"
+  
+  # Block external calls (privacy protection)
+  BLOCK_EXTERNAL_CALLS: true
+  
+  # Audit all network requests
+  AUDIT_NETWORK_CALLS: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  main_log: "logs/guardian.log"
+  blocked_calls_log: "logs/blocked_calls.log"
+  audit_log: "logs/audit.log"
+  family_queries_log: "logs/family_queries.log"
+  
+  # Log rotation
+  rotation:
+    enabled: true
+    max_bytes: 10485760  # 10 MB
+    backup_count: 5
+
+# Family Assistant Configuration
+family_assistant:
+  enabled: true
+  
+  # Family LLM settings
+  family_llm:
+    default_safety_level: "standard"  # strict, moderate, standard
+    filter_inappropriate_content: true
+    age_verification_required: false
+  
+  # GUI settings
+  gui_enabled: true
+  gui:
+    theme: "family_friendly"  # family_friendly, professional, high_contrast
+    font_size: "medium"  # small, medium, large
+    show_confidence_scores: true
+    enable_visual_feedback: true
+  
+  # Voice interface settings
+  voice_interface:
+    enabled: false
+    wake_word: "guardian"
+    session_timeout: 60  # seconds
+    offline_mode: true
     
-    if len(sys.argv) != 2:
-        print("Usage: python config_validator.py <config_file.yaml>")
-        sys.exit(1)
-    
-    config_file = sys.argv[1]
-    if not Path(config_file).exists():
-        print(f"Error: Configuration file not found: {config_file}")
-        sys.exit(1)
-    
-    valid, config, errors = load_and_validate_config(config_file)
-    
-    if valid:
-        print("✅ Configuration is valid")
-        print(f"System: {config.get('system', {}).get('name')} v{config.get('system', {}).get('version')}")
-    else:
-        print("❌ Configuration validation failed:")
-        for error in errors:
-            print(f"  - {error}")
-        sys.exit(1)
+  # Parental controls
+  parental_controls:
+    enabled: true
+    require_parent_approval: false
+    content_filtering: true
+    time_restrictions:
+      enabled: false
+      daily_limit_minutes: 120
+
+# Skills Configuration
+skills:
+  # Available security skills
+  enabled_skills:
+    - "threat_analysis"
+    - "password_check"
+    - "device_scan"
+    - "parental_control_check"
+    - "phishing_education"
+    - "network_security_audit"
+  
+  # Skill execution settings
+  execution:
+    timeout: 30  # seconds
+    max_concurrent: 3
+    require_confirmation: false
+
+# Security Settings
+security:
+  # Privacy protection
+  privacy_mode: true
+  offline_first: true
+  
+  # Data handling
+  store_conversations: false
+  anonymize_logs: true
+  
+  # Audit settings
+  comprehensive_audit: true
+  audit_retention_days: 90
+
+# Device Detection
+device_detection:
+  enabled: false  # Requires additional dependencies (scapy, netifaces)
+  scan_interval: 300  # seconds
+  auto_assess_security: false
+
+# Performance Settings
+performance:
+  cache_enabled: true
+  cache_size_mb: 100
+  preload_models: false
+
+# Feature Flags
+features:
+  mcp_server: true
+  grok_integration: false
+  voice_commands: false
+  device_monitoring: false
+  network_scanning: false
