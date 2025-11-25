@@ -1,3 +1,105 @@
-# Ignore virtual environments
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
 venv/
-guardian-node/venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Core dumps
+core
+core.*
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model files (large binaries)
+*.gguf
+*.bin
+*.onnx
+*.pt
+*.pth
+*.safetensors
+models/
+
+# Data files
+*.db
+*.sqlite
+*.sqlite3
+data/*.json
+data/*.csv
+
+# Docker
+.dockerignore
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Cache directories
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# Voice models (optional - uncomment if voice models are too large)
+# voice_models/
+# *.pmdl
+# *.ppn
+
+# Configuration overrides (keep template)
+config.local.yaml
+secrets.yaml
