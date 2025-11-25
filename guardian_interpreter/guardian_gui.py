@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QFormLayout, QLineEdit, QComboBox
 )
 from PySide6.QtGui import QPixmap, QFont, QPalette, QColor, QIcon
-from PySide6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
+from PySide6.QtCore import Qt, QTimer, QThread, Signal, QSize
 
 # Import Guardian components
 try:
@@ -34,7 +34,7 @@ class GuardianModeUI(QWidget):
     """Main mode switching interface with themed graphics"""
     
     # Signal emitted when mode changes
-    mode_changed = pyqtSignal(str)
+    mode_changed = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)

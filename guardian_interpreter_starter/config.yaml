@@ -1,2 +1,135 @@
+# ============================================================================
+# Guardian Node Configuration
+# Privacy-first AI system for families and small businesses
+# ============================================================================
+
+# Core System Settings
 ALLOW_ONLINE: false
 MODEL_PATH: "./models/your-model.gguf"
+
+# ============================================================================
+# Voice System Configuration
+# ============================================================================
+
+voice_system:
+  enabled: true
+  offline_mode: true              # True offline operation after initial setup
+  privacy_mode: true              # No logging of spoken content
+  
+voice_output:
+  speech_rate: 150                # Words per minute (100-200 recommended)
+  volume: 0.8                     # Volume level (0.0 to 1.0)
+  family_mode: true               # Enable family-friendly content filtering
+  child_friendly_voice: true      # Use child-appropriate voices
+  log_speech: false               # Privacy setting - never log spoken content
+
+# Voice profiles for different age groups
+# Uses Microsoft Edge TTS neural voices for high-quality output
+voice_profiles:
+  child:
+    voice_name: "en-US-JennyNeural"    # Warm, friendly voice
+    pitch: "+10Hz"                      # Slightly higher pitch
+    rate: "+10%"                        # Slightly faster
+    description: "Child-friendly, reassuring tone"
+  teen:
+    voice_name: "en-US-AriaNeural"     # Clear, educational voice
+    pitch: "0Hz"                        # Normal pitch
+    rate: "0%"                          # Normal speed
+    description: "Educational and engaging"
+  adult:
+    voice_name: "en-US-DavisNeural"    # Professional, authoritative voice
+    pitch: "0Hz"                        # Normal pitch
+    rate: "0%"                          # Normal speed
+    description: "Professional and technical"
+
+# Audio System Settings
+audio:
+  tts_service: "edge_tts_offline"     # Edge TTS with offline caching
+  output_format: "mp3"                # MP3 format for efficiency
+  sample_rate: 24000                  # 24kHz for high quality
+  bitrate: "variable"                 # Optimized for speech
+  cache_enabled: true                 # Enable local caching
+  audio_files_path: "./skills/audio_explanations/audio_files"
+  cache_path: "./skills/audio_explanations/cache"
+  metadata_path: "./skills/audio_explanations/metadata.json"
+
+# Security Risk Types and Content
+# Pre-recorded explanations for common security threats
+security_risks:
+  - phishing                          # Email and web-based deception
+  - malware                           # Malicious software threats
+  - weak_password                     # Password security issues
+  - suspicious_network                # Network connection risks
+
+# Age Groups for Content Adaptation
+age_groups:
+  - child                             # Ages 6-12: Simple, reassuring
+  - teen                              # Ages 13-17: Educational, practical
+  - adult                             # Ages 18+: Technical, comprehensive
+
+# ============================================================================
+# Skills Configuration
+# ============================================================================
+
+skills:
+  enabled: true
+  allowed_skills:
+    - offline_voice_explain           # Offline voice explanation playback
+    - audio_pre_recorder              # Pre-record voice explanations
+    - security_coach                  # Interactive security coaching
+  
+  skill_timeout: 300                  # Maximum execution time (seconds)
+  skill_isolation: true               # Run skills in isolated environment
+  skill_logging: true                 # Log skill execution
+
+# Security Coach Settings
+security_coach:
+  enabled: true
+  voice_enabled: true
+  interactive_mode: true
+  age_verification: true              # Verify age before content delivery
+  content_filtering: true             # Filter inappropriate content
+  coaching_scenarios:
+    - phishing_email
+    - malware_download
+    - password_creation
+    - public_wifi_safety
+    - social_engineering
+
+# ============================================================================
+# Privacy & Security Settings
+# ============================================================================
+
+privacy:
+  offline_first: true                 # Prioritize offline operation
+  no_telemetry: true                  # Never send usage data
+  local_storage_only: true            # All data stays local
+  audit_logging: true                 # Log for security audits
+  data_encryption: false              # Enable if storing sensitive data
+
+security:
+  skill_allowlist: true               # Only allow whitelisted skills
+  input_sanitization: true            # Sanitize all user inputs
+  timeout_enforcement: true           # Enforce skill timeouts
+  resource_limits: true               # Limit skill resource usage
+
+# ============================================================================
+# System Performance Settings
+# ============================================================================
+
+performance:
+  lazy_loading: true                  # Load resources on demand
+  cache_preloading: false             # Don't preload cache at startup
+  memory_limit_mb: 512                # Maximum memory usage
+  audio_buffer_size: 4096             # Audio playback buffer
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+
+logging:
+  level: "INFO"                       # DEBUG, INFO, WARNING, ERROR
+  file_path: "./logs/guardian.log"
+  max_file_size_mb: 10
+  backup_count: 3
+  privacy_filter: true                # Filter sensitive data from logs
