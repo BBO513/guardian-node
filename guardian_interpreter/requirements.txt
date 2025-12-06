@@ -1,0 +1,189 @@
+# Guardian Node - Family Cybersecurity System
+# Main dependencies for Guardian Node
+# Install with: pip install -r requirements.txt
+
+# ===================================================================
+# CORE DEPENDENCIES (Required for basic functionality)
+# ===================================================================
+
+# Configuration management
+pyyaml>=6.0
+
+# System utilities
+psutil>=5.8.0
+
+# Network operations (used by some features)
+requests>=2.25.0
+ipaddress>=1.0.23
+
+# Security and cryptography
+cryptography>=41.0.0
+
+# ===================================================================
+# LLM INTEGRATION (Required for AI functionality)
+# ===================================================================
+
+# Local LLM inference
+llama-cpp-python>=0.2.72
+
+# NOTE: Model files are NOT installed via pip
+# See guardian_interpreter/llm_integration.py for model download instructions
+
+# ===================================================================
+# RAG / PERSISTENT MEMORY (For long-term memory across sessions)
+# ===================================================================
+
+# Vector database for persistent memory
+chromadb>=0.4.22
+
+# Embedding model for semantic search
+sentence-transformers>=2.2.2
+
+# ===================================================================
+# GUI DEPENDENCIES (Required for graphical interface)
+# ===================================================================
+
+# GUI framework
+PySide6>=6.0.0
+
+# Visualization
+matplotlib>=3.5.0
+
+# ===================================================================
+# VOICE INTERFACE (Optional - for voice features)
+# ===================================================================
+
+# Speech recognition (offline with pocketsphinx)
+SpeechRecognition>=3.10.0
+
+# Text-to-speech (offline)
+pyttsx3>=2.90
+
+# Audio backends (choose based on your platform)
+# Linux: portaudio19-dev (apt install portaudio19-dev)
+# Windows/Mac: included with pyaudio
+pyaudio>=0.2.11  # May require system packages
+sounddevice>=0.4.6
+
+# For offline speech recognition
+pocketsphinx>=5.0.0  # Offline STT engine
+
+# Note: On Raspberry Pi, you may also need:
+# sudo apt-get install portaudio19-dev python3-pyaudio espeak-ng
+
+# ===================================================================
+# DEVICE DETECTION & NETWORK SCANNING
+# ===================================================================
+
+# Network scanning capabilities
+python-nmap>=0.7.1  # Nmap wrapper for Python
+scapy>=2.5.0  # Packet manipulation and network discovery
+netifaces>=0.11.0  # Network interface information
+
+# Note: Requires nmap binary installed on system
+# Linux: apt-get install nmap
+# Mac: brew install nmap
+# Windows: Download from nmap.org
+
+# ===================================================================
+# REST API SERVER (For mobile app integration)
+# ===================================================================
+
+# Flask web framework
+flask>=2.3.0
+flask-cors>=4.0.0  # Enable CORS for mobile apps
+waitress>=2.1.2  # Production WSGI server
+
+# ===================================================================
+# MCP SERVER (For Grok/Kiro integration)
+# ===================================================================
+
+# Model Context Protocol
+mcp>=0.1.0  # or mcp-agent
+
+# ===================================================================
+# MONITORING AND LOGGING (Optional)
+# ===================================================================
+
+# Prometheus metrics
+prometheus-client>=0.14.0
+
+# ===================================================================
+# DEVELOPMENT DEPENDENCIES (Optional - for contributors)
+# ===================================================================
+
+# Testing framework
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+
+# Code formatting
+# black>=22.0.0
+# flake8>=4.0.0
+# isort>=5.0.0
+
+# Type checking
+# mypy>=1.0.0
+
+# ===================================================================
+# ADDITIONAL UTILITIES
+# ===================================================================
+
+# Git LFS for large files (models)
+# git-lfs  # System package, not pip installable
+
+# ===================================================================
+# INSTALLATION NOTES
+# ===================================================================
+
+# 1. BASIC INSTALLATION (Core + GUI + LLM)
+#    pip install -r requirements.txt
+#
+# 2. MINIMAL INSTALLATION (No optional features)
+#    pip install pyyaml psutil requests cryptography llama-cpp-python PySide6
+#
+# 3. FULL INSTALLATION (All features)
+#    Uncomment optional dependencies above and run:
+#    pip install -r requirements.txt
+#
+# 4. SYSTEM DEPENDENCIES
+#    Some packages may require system-level dependencies:
+#    
+#    Ubuntu/Debian:
+#      sudo apt-get install portaudio19-dev python3-dev
+#    
+#    macOS:
+#      brew install portaudio
+#    
+#    Windows:
+#      Most dependencies are bundled with pip packages
+#
+# 5. TROUBLESHOOTING
+#    - If llama-cpp-python fails to install, try:
+#      pip install llama-cpp-python --no-cache-dir
+#    
+#    - If PySide6 has issues, try:
+#      pip install PySide6 --upgrade
+#    
+#    - For voice features on Linux without audio:
+#      pip install pyttsx3 speechrecognition (skip pyaudio)
+#
+# 6. DOCKER INSTALLATION
+#    Dependencies are handled by Dockerfile
+#    No manual installation needed when using Docker
+
+# ===================================================================
+# PLATFORM-SPECIFIC NOTES
+# ===================================================================
+
+# Raspberry Pi:
+#   - Use lighter models (Phi-3-mini recommended)
+#   - Consider disabling voice features if resources are limited
+#   - Install: sudo apt-get install python3-pyside6.qtcore
+#
+# Windows WSL:
+#   - Audio features may have limitations
+#   - Use Windows-native Python for full audio support
+#
+# macOS:
+#   - Apple Silicon: llama-cpp-python has optimized builds
+#   - Use: pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/metal
