@@ -4,7 +4,7 @@
 
 import os
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Iterator
 
 try:
     from llama_cpp import Llama
@@ -132,6 +132,32 @@ class GuardianLLM:
             self.logger.error(error_msg)
             return error_msg
 
+    def stream_response(self, prompt: str, system_prompt: str = None) -> Iterator[str]:
+        """Yield the response in chunks as it is generated (same settings as generate_response).
+
+        On a Pi 5, Phi-4-mini produces ~4 tokens/s, so streaming lets the GUI show text and
+        the voice start speaking within seconds instead of after the whole answer.
+        """
+        if not self.is_loaded():
+            yield "Error: LLM model not loaded. Please check configuration and model file."
+            return
+        llm_config = self.config.get('llm', {})
+        try:
+            for chunk in self.llm(
+                self._prepare_prompt(prompt, system_prompt),
+                max_tokens=llm_config.get('max_tokens', 512),
+                temperature=llm_config.get('temperature', 0.7),
+                stop=["Human:", "User:", "\n\n"],
+                echo=False,
+                stream=True,
+            ):
+                text = chunk['choices'][0]['text']
+                if text:
+                    yield text
+        except Exception as e:
+            self.logger.error(f"Error streaming response: {e}")
+            yield f"Error generating response: {e}"
+
     def _prepare_prompt(self, user_prompt: str, system_prompt: str = None) -> str:
         if system_prompt:
             return f"System: {system_prompt}\n\nHuman: {user_prompt}\n\nAssistant:"
@@ -189,6 +215,9 @@ class MockLLM:
         ]
         response_index = hash(prompt) % len(responses)
         return responses[response_index]
+
+    def stream_response(self, prompt: str, system_prompt: str = None) -> Iterator[str]:
+        yield self.generate_response(prompt, system_prompt)
 
     def get_model_info(self) -> Dict[str, Any]:
         return {

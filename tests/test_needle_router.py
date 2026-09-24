@@ -82,5 +82,16 @@ class TestArgumentReaders(unittest.TestCase):
         self.assertEqual(R.detect_topic("teach my 10 year old how to spot fake websites"), "spot fake websites")
 
 
+class TestScamRedFlags(unittest.TestCase):
+    def test_flags(self):
+        from guardian_interpreter.guardian_tools import scam_red_flags
+        r = scam_red_flags("your netflix account is suspended, pay now at netflix-billing.xyz")
+        self.assertEqual(r["status"], "high scam risk")
+        r = scam_red_flags("hi mum my phone broke, new number, can you send 200 for rent")
+        self.assertIn("'new number' family impersonation", r["red_flags"])
+        self.assertIn("asks for money or payment details", r["red_flags"])
+        self.assertEqual(scam_red_flags("see you at 5 for tea")["red_flags"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

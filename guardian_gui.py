@@ -7,6 +7,10 @@ import sys
 import os
 import html
 import logging
+import queue
+import re
+import threading
+import time
 import urllib.request
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable
@@ -54,6 +58,17 @@ try:
     from guardian_interpreter.voice.voice_interface import VoiceInterface
 except Exception:
     VoiceInterface = None
+
+# Needle 3 command router: instant offline actions (lights, scans, checks, lessons);
+# everything else falls through to the LLM. Optional: without cactus-needle the GUI is LLM-only.
+try:
+    from guardian_interpreter import needle_router
+    from guardian_interpreter import guardian_tools
+except Exception:
+    needle_router = None
+    guardian_tools = None
+
+SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
 def resource_path(relative_path: str) -> str:
@@ -366,6 +381,7 @@ class ChatPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._messages = []  # (speaker, text, color)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -433,12 +449,23 @@ class ChatPanel(QWidget):
     def append_system(self, text: str):
         self._append("System", text, "#757575")
 
+    def update_last_assistant(self, text: str):
+        """Replace the text of the latest Guardian message (used while an answer streams in)."""
+        if self._messages and self._messages[-1][0] == "Guardian":
+            self._messages[-1] = ("Guardian", text, self._messages[-1][2])
+            self._render()
+        else:
+            self.append_assistant(text)
+
     def _append(self, speaker: str, text: str, color: str):
-        safe = html.escape(text)
-        self.history.append(
+        self._messages.append((speaker, text, color))
+        self._render()
+
+    def _render(self):
+        self.history.setHtml("".join(
             f'<p style="margin:4px 0;"><span style="color:{color}; font-weight:bold;">'
-            f'{speaker}:</span> <span style="white-space:pre-wrap;">{safe}</span></p>'
-        )
+            f'{speaker}:</span> <span style="white-space:pre-wrap;">{html.escape(text)}</span></p>'
+            for speaker, text, color in self._messages))
         scrollbar = self.history.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
@@ -479,34 +506,95 @@ class ModelLoadThread(QThread):
             self.failed.emit(str(e))
 
 
-class InferenceThread(QThread):
-    """Runs a single prompt against the loaded model without freezing the UI."""
+class RouterLoadThread(QThread):
+    """Loads the Needle command router (about 1s) so commands work before the LLM is ready."""
 
-    finished = Signal(str)
+    loaded = Signal(object)
+    failed = Signal(str)
+
+    def run(self):
+        try:
+            weights = needle_router.find_router_weights(get_models_dir())
+            router = needle_router.NeedleRouter(weights=weights, backend=guardian_tools.GuardianBackend())
+            self.loaded.emit(router)
+        except Exception as e:
+            self.failed.emit(str(e))
+
+
+def route_command(router, text):
+    """Run text through the command router. Returns the RouteResult if it acted, else None."""
+    if router is None:
+        return None
+    try:
+        res = router.route(text)
+    except Exception as e:
+        logging.getLogger('guardian.router').error(f"Router failed, falling back to LLM: {e}")
+        return None
+    return res if res.route == "tools" else None
+
+
+class AssistantThread(QThread):
+    """Answers one chat message: instant command via the router, otherwise a streamed LLM answer."""
+
+    partial = Signal(str)          # LLM answer so far (streaming)
+    finished = Signal(str, str)    # (final text, kind: "command" | "llm" | "unavailable")
     error = Signal(str)
 
-    def __init__(self, llm, prompt, parent=None):
+    def __init__(self, router, llm, prompt, parent=None):
         super().__init__(parent)
+        self.router = router
         self.llm = llm
         self.prompt = prompt
 
     def run(self):
         try:
-            self.finished.emit(self.llm.generate_response(self.prompt))
+            llm_ready = self.llm is not None and self.llm.is_loaded()
+            prompt, text = self.prompt, ""
+            res = route_command(self.router, self.prompt)
+            if res is not None:
+                reply = needle_router.describe(res)
+                follow = needle_router.followup_prompt(res)
+                if follow is None or not llm_ready:
+                    self.finished.emit(reply, "command")
+                    return
+                # e.g. a scam check: show the instant result, then let the LLM explain it
+                prompt, text = follow, reply + "\n\n"
+                self.partial.emit(text)
+            elif not llm_ready:
+                self.finished.emit("", "unavailable")
+                return
+            last_emit = 0.0
+            for chunk in self.llm.stream_response(prompt):
+                text += chunk
+                if time.time() - last_emit > 0.25:     # don't redraw the chat for every token
+                    self.partial.emit(text)
+                    last_emit = time.time()
+            self.finished.emit(text.strip(), "llm")
         except Exception as e:
             self.error.emit(str(e))
 
 
 class VoiceSessionThread(QThread):
-    """Runs listen -> transcribe -> generate -> speak off the UI thread."""
+    """Runs listen -> route or generate -> speak off the UI thread.
+
+    Commands are spoken back immediately. LLM answers are streamed and spoken a sentence at a
+    time by a separate speaker thread, so Guardian starts talking while it is still thinking.
+    """
 
     status = Signal(str)
     finished = Signal(str, str)  # (transcribed_text, response)
 
-    def __init__(self, voice_interface, llm, parent=None):
+    def __init__(self, voice_interface, llm, router=None, parent=None):
         super().__init__(parent)
         self.voice_interface = voice_interface
         self.llm = llm
+        self.router = router
+
+    def _say(self, text):
+        try:
+            self.voice_interface.speak(text)
+        except Exception as e:
+            print(f"Speak failed: {e}")
 
     def run(self):
         try:
@@ -517,17 +605,47 @@ class VoiceSessionThread(QThread):
                 return
 
             self.status.emit("processing")
-            response = None
-            if self.llm is not None and self.llm.is_loaded():
-                response = self.llm.generate_response(text)
+            llm_ready = self.llm is not None and self.llm.is_loaded()
+            prompt, full = text, ""
+            res = route_command(self.router, text)
+            if res is not None:
+                self.status.emit("speaking")
+                self._say(needle_router.describe(res, spoken=True))
+                follow = needle_router.followup_prompt(res)
+                if follow is None or not llm_ready:
+                    self.finished.emit(text, needle_router.describe(res))
+                    return
+                prompt, full = follow, needle_router.describe(res) + "\n\n"
+            elif not llm_ready:
+                self.finished.emit(text, "")
+                return
 
-            self.status.emit("speaking")
-            if response:
-                try:
-                    self.voice_interface.speak(response)
-                except Exception as e:
-                    print(f"Speak failed: {e}")
-            self.finished.emit(text, response or "")
+            sentences = queue.Queue()
+
+            def speaker():
+                while True:
+                    s = sentences.get()
+                    if s is None:
+                        return
+                    self.status.emit("speaking")
+                    self._say(s)
+
+            worker = threading.Thread(target=speaker, daemon=True)
+            worker.start()
+            pending = ""
+            for chunk in self.llm.stream_response(prompt):
+                full += chunk
+                pending += chunk
+                parts = SENTENCE_END.split(pending)
+                for sentence in parts[:-1]:
+                    if sentence.strip():
+                        sentences.put(sentence.strip())
+                pending = parts[-1]
+            if pending.strip():
+                sentences.put(pending.strip())
+            sentences.put(None)
+            worker.join()
+            self.finished.emit(text, full.strip())
         except Exception as e:
             print(f"Voice session error: {e}")
             self.finished.emit("", "")
@@ -551,6 +669,9 @@ class GuardianBackend:
                 self.voice_interface = None
 
     def run_query(self, text):
+        res = route_command(self._window.router, text)
+        if res is not None:
+            return needle_router.describe(res)
         llm = self._window.llm
         if llm is not None and llm.is_loaded():
             return llm.generate_response(text)
@@ -572,6 +693,9 @@ class GuardianMainWindow(QMainWindow):
         self._llm_thread = None
         self._infer_thread = None
         self._voice_thread = None
+        self.router = None
+        self._router_thread = None
+        self._streaming = False
 
         # The standalone (packaged) app has no external guardian; provide a real
         # backend so voice_interface and run_query are available, not None.
@@ -581,8 +705,9 @@ class GuardianMainWindow(QMainWindow):
         self.setup_ui()
         self.setup_mode_integration()
         self.setup_chat_integration()
+        self.start_router_loading()
         self.start_model_loading()
-    
+
     def setup_ui(self):
         """Setup main window UI"""
         self.setWindowTitle("Guardian Node - Family Protection")
@@ -714,25 +839,57 @@ class GuardianMainWindow(QMainWindow):
         self.chat.set_status("AI model unavailable")
         self.chat.append_system(f"Could not load the AI model: {err}")
 
+    def start_router_loading(self):
+        """Load the Needle command router; the app still works (LLM-only) if it can't."""
+        if needle_router is None:
+            print("Command router unavailable (cactus-needle not installed); using the LLM only")
+            return
+        self._router_thread = RouterLoadThread()
+        self._router_thread.loaded.connect(self._on_router_loaded)
+        self._router_thread.failed.connect(lambda err: print(f"Command router failed to load: {err}"))
+        self._router_thread.start()
+
+    def _on_router_loaded(self, router):
+        self.router = router
+        if self.llm is None:
+            self.chat.append_system("Quick commands are ready (lights, scans, security checks). "
+                                    "The AI model for questions is still loading.")
+
     def _on_chat_message(self, text: str):
         if not text.strip():
             return
         self.chat.append_user(text)
-        if self.llm is None:
+        if self.router is None and self.llm is None:
             if self.llm_loading:
                 self.chat.append_system("The AI model is still loading — please wait a moment and try again.")
             else:
                 self.chat.append_system("The AI model isn't loaded, so I can't answer right now.")
             return
         self.chat.set_thinking(True)
-        self._infer_thread = InferenceThread(self.llm, text)
+        self._streaming = False
+        self._infer_thread = AssistantThread(self.router, self.llm, text)
+        self._infer_thread.partial.connect(self._on_inference_partial)
         self._infer_thread.finished.connect(self._on_inference_done)
         self._infer_thread.error.connect(self._on_inference_error)
         self._infer_thread.start()
 
-    def _on_inference_done(self, response: str):
+    def _on_inference_partial(self, text: str):
+        if self._streaming:
+            self.chat.update_last_assistant(text)
+        else:
+            self._streaming = True
+            self.chat.append_assistant(text)
+
+    def _on_inference_done(self, response: str, kind: str):
         self.chat.set_thinking(False)
-        self.chat.append_assistant(response)
+        if kind == "unavailable":
+            self.chat.append_system("That needs the AI model, which is still loading — please try again in a moment."
+                                    if self.llm_loading else "The AI model isn't loaded, so I can't answer that.")
+        elif self._streaming:
+            self.chat.update_last_assistant(response)
+        else:
+            self.chat.append_assistant(response)
+        self._streaming = False
 
     def _on_inference_error(self, err: str):
         self.chat.set_thinking(False)
@@ -802,7 +959,7 @@ class GuardianMainWindow(QMainWindow):
         self.status_widget.status_label.setText("🎤 Listening...")
         self.status_widget.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
 
-        self._voice_thread = VoiceSessionThread(voice_interface, self.llm)
+        self._voice_thread = VoiceSessionThread(voice_interface, self.llm, self.router)
         self._voice_thread.status.connect(self._on_voice_status)
         self._voice_thread.finished.connect(self._on_voice_done)
         self._voice_thread.start()
@@ -1021,6 +1178,11 @@ class GuardianMainWindow(QMainWindow):
         """Handle application close"""
         if self.resource_monitor:
             self.resource_monitor.stop()
+        if self.router is not None:
+            try:
+                self.router.close()     # stops Needle's worker process
+            except Exception:
+                pass
         event.accept()
 
 

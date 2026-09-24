@@ -158,6 +158,74 @@ def fallback_args(name: str, clause: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+TOOL_LABELS = {
+    "turn_on": "Turn on", "turn_off": "Turn off", "set_temperature": "Set temperature",
+    "get_device_status": "Device status", "scan_network": "Network scan", "check_router": "Router check",
+    "check_wifi_security": "Wi-Fi check", "check_parental_controls": "Parental controls check",
+    "check_iot_devices": "Smart device check", "analyze_threat": "Scam check", "start_child_lesson": "Lesson",
+}
+
+
+def describe_call(call: Dict[str, Any], spoken: bool = False) -> str:
+    """A short human reply for one executed tool call."""
+    label = TOOL_LABELS.get(call["name"], call["name"])
+    res = call.get("result")
+    if isinstance(res, dict):
+        if res.get("ok") is False or res.get("success") is False:
+            return f"Sorry, the {label.lower()} didn't work: {res.get('error', 'unknown error')}."
+        if res.get("message"):
+            return str(res["message"]).replace("Mock: ", "")
+        if "state" in res:
+            return f"The {call['args'].get('device', 'device')} is {res['state']}."
+        if "red_flags" in res:
+            flags = res["red_flags"]
+            found = f" Warning signs: {', '.join(flags)}." if flags else " No obvious warning signs."
+            return f"{label}: {res['status']}.{found}"
+        if "status" in res:
+            recs = res.get("recommendations") or []
+            tip = f" Top tip: {recs[0]}" if recs else ""
+            more = f" ({len(recs) - 1} more in the report.)" if len(recs) > 1 and not spoken else ""
+            return f"{label}: {res['status']}.{tip}{more}"
+        return f"{label}: done."
+    if isinstance(res, str) and res.strip():
+        if not spoken:
+            return res.strip()
+        lines = [ln.strip() for ln in res.strip().splitlines() if ln.strip() and not set(ln.strip()) <= set("=-*#")]
+        return " ".join(lines[:3])[:300]
+    return f"{label}: done."
+
+
+def describe(res: "RouteResult", spoken: bool = False) -> str:
+    return "\n".join(describe_call(c, spoken) for c in res.calls)
+
+
+def followup_prompt(res: "RouteResult") -> Optional[str]:
+    """A prompt for the LLM to explain a result in plain words, when a tool alone isn't enough.
+
+    Scam checks need judgement a rule list can't give, so the red flags are handed to the LLM.
+    """
+    for c in res.calls:
+        r = c.get("result")
+        if c["name"] == "analyze_threat" and isinstance(r, dict) and "red_flags" in r:
+            flags = ", ".join(r["red_flags"]) or "none found by the quick check"
+            return (f'A family member received this message: "{r["content"]}"\n'
+                    f"Quick check warning signs: {flags}.\n"
+                    "Is this likely a scam? Reply in 2-4 short sentences for a family: your verdict, "
+                    "the main reason, and what they should do next. Never invent website addresses, "
+                    "phone numbers or organisation names; say to contact the company through its official "
+                    "app or a number they already trust.")
+    return None
+
+
+def find_router_weights(models_dir: str) -> Optional[str]:
+    """Prefer the Guardian fine-tuned model, then a local base model; None = Needle's cached base."""
+    for name in ("guardian_needle.cact", "needle3.cact"):
+        path = os.path.join(models_dir, name)
+        if os.path.exists(path):
+            return path
+    return None
+
+
 @dataclass
 class RouteResult:
     route: str                      # "tools" or "llm"

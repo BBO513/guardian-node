@@ -61,12 +61,39 @@ class GuardianBackend:
             from guardian_interpreter.protocols import iot_security_protocol
             return iot_security_protocol.analyze()
         if name == "analyze_threat":
-            from guardian_interpreter.skills import threat_analysis_skill
-            return threat_analysis_skill.run(kwargs["content"])
+            return scam_red_flags(kwargs["content"])
         if name == "start_child_lesson":
             from guardian_interpreter.skills import child_education_skill
-            return child_education_skill.run(f"{kwargs['age_group']} activity {kwargs['topic']}")
+            # the skill keys its content on school-stage words, not "child"/"teen"
+            stage = "elementary" if kwargs["age_group"] == "child" else "high school"
+            return child_education_skill.run(f"{stage} {kwargs['topic']}")
         raise ValueError(f"unknown tool {name}")
+
+
+SCAM_SIGNS = [
+    (r"\b(urgent|immediately|within 24 hours|today only|act now|final notice|suspended|locked|expire[sd]?)\b",
+     "pressure to act fast"),
+    (r"\b(pay|payment|fee|refund|voucher|gift card|bank details|card details|crypto|bitcoin|send (me |us )?(£|\$)?\d+)\b",
+     "asks for money or payment details"),
+    (r"\b(password|passcode|pin|login|log in|verify|confirm your|security code|one[- ]time code|\bcode\b)",
+     "asks you to log in, verify or share a code"),
+    (r"https?://|\bwww\.|\bbit\.ly\b|\btinyurl\b|\b[\w-]+\.(xyz|top|info|click|link|co|net)\b", "contains a link"),
+    (r"\b(won|winner|congratulations|prize|free)\b", "too-good-to-be-true offer"),
+    (r"\b(hi mum|hi dad|new number|my phone broke)\b", "'new number' family impersonation"),
+    (r"\b(hmrc|dvla|royal mail|dpd|evri|amazon|netflix|paypal|apple|microsoft|bank)\b",
+     "claims to be a well-known organisation"),
+    (r"[a-z]+[0-9][a-z]*\.(com|net|co)\b|\b(paypa1|amaz0n|app1e|micros0ft)\b", "lookalike web address"),
+]
+
+
+def scam_red_flags(content: str) -> Dict[str, Any]:
+    """Instant, offline red-flag check on a suspicious message (the LLM explains the verdict)."""
+    import re
+    flags = [label for pattern, label in SCAM_SIGNS if re.search(pattern, content, re.IGNORECASE)]
+    level = "high" if len(flags) >= 3 else "medium" if flags else "low"
+    return {"status": f"{level} scam risk", "red_flags": flags, "content": content,
+            "recommendations": ["Don't click links or reply; contact the organisation using a number or app you "
+                                "already trust."] if flags else []}
 
 
 class RecordingBackend:
