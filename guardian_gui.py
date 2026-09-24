@@ -69,6 +69,10 @@ except Exception:
     guardian_tools = None
 
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+VOICE_SYSTEM_PROMPT = (
+    "You are Guardian, a friendly family cybersecurity assistant running offline on a home device. "
+    "You are speaking out loud, so answer in 2 or 3 short, simple sentences with no lists, "
+    "headings or symbols.")
 
 
 def resource_path(relative_path: str) -> str:
@@ -577,8 +581,8 @@ class AssistantThread(QThread):
 class VoiceSessionThread(QThread):
     """Runs listen -> route or generate -> speak off the UI thread.
 
-    Commands are spoken back immediately. LLM answers are streamed and spoken a sentence at a
-    time by a separate speaker thread, so Guardian starts talking while it is still thinking.
+    Commands are spoken back immediately. LLM answers are kept short, streamed, and spoken a
+    sentence at a time by a player thread, so Guardian starts talking while it is still thinking.
     """
 
     status = Signal(str)
@@ -620,30 +624,43 @@ class VoiceSessionThread(QThread):
                 self.finished.emit(text, "")
                 return
 
-            sentences = queue.Queue()
+            # The LLM and the neural voice each want every CPU core, so on a Pi they take turns
+            # instead of competing: write a sentence, pause the LLM while it is turned into audio,
+            # then write the next while that audio plays (playback needs almost no CPU).
+            vi = self.voice_interface
+            prepare = getattr(vi, "can_prepare_audio", False)
+            audio = queue.Queue()
 
-            def speaker():
+            def speak_next(sentence):
+                audio.put(vi.synthesize(sentence) if prepare else sentence)
+
+            def player():
                 while True:
-                    s = sentences.get()
-                    if s is None:
+                    item = audio.get()
+                    if item is None:
                         return
                     self.status.emit("speaking")
-                    self._say(s)
+                    if prepare:
+                        vi.play_file(item) if item else None
+                    else:
+                        self._say(item)
 
-            worker = threading.Thread(target=speaker, daemon=True)
+            worker = threading.Thread(target=player, daemon=True)
             worker.start()
             pending = ""
-            for chunk in self.llm.stream_response(prompt):
+            # Spoken answers stay short; follow-up prompts (e.g. scam checks) set their own length.
+            system = None if prompt is not text else VOICE_SYSTEM_PROMPT
+            for chunk in self.llm.stream_response(prompt, system_prompt=system):
                 full += chunk
                 pending += chunk
                 parts = SENTENCE_END.split(pending)
                 for sentence in parts[:-1]:
                     if sentence.strip():
-                        sentences.put(sentence.strip())
+                        speak_next(sentence.strip())
                 pending = parts[-1]
             if pending.strip():
-                sentences.put(pending.strip())
-            sentences.put(None)
+                speak_next(pending.strip())
+            audio.put(None)
             worker.join()
             self.finished.emit(text, full.strip())
         except Exception as e:

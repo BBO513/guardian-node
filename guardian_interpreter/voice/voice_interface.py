@@ -33,12 +33,60 @@ except Exception:
     PiperVoice = None
     PIPER_AVAILABLE = False
 
+# Kokoro (neural, offline, most natural) is preferred when its model files are present.
+try:
+    from kokoro_onnx import Kokoro
+    KOKORO_AVAILABLE = True
+except Exception:
+    Kokoro = None
+    KOKORO_AVAILABLE = False
+
+TTS_PREFERENCE = os.environ.get("GUARDIAN_TTS", "kokoro").lower()        # "kokoro" or "piper"
+KOKORO_VOICE = os.environ.get("GUARDIAN_KOKORO_VOICE", "bf_emma")
+# fp16 is ~3x faster than int8 on a Pi 5 CPU (~1.1x realtime) at the same quality.
+KOKORO_MODELS = ("kokoro-v1.0.fp16.onnx", "kokoro-v1.0.onnx", "kokoro-v1.0.int8.onnx")
 PIPER_VOICE_NAME = os.environ.get("PIPER_VOICE_NAME", "en_US-lessac-medium")
+# Loudness boost for small speakers/headsets. Piper already peaks at full scale, so plain gain
+# would clip; this compresses (soft-limits) instead: 1.0 = off, 2-3 = noticeably louder.
+VOICE_GAIN = float(os.environ.get("GUARDIAN_VOICE_GAIN", "2.5"))
+
+
+def _boost_loudness(wav_path: str, gain: float) -> None:
+    """Raise perceived loudness in place with a soft limiter (tanh), without harsh clipping."""
+    if gain <= 1.0:
+        return
+    try:
+        import numpy as np
+        import wave as _wave
+        with _wave.open(wav_path, "rb") as wf:
+            params = wf.getparams()
+            data = wf.readframes(wf.getnframes())
+        if params.sampwidth != 2:
+            return
+        x = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+        y = np.tanh(gain * x) / np.tanh(gain) * 0.97
+        with _wave.open(wav_path, "wb") as wf:
+            wf.setparams(params)
+            wf.writeframes((y * 32767).astype(np.int16).tobytes())
+    except Exception:
+        pass
 
 
 def _piper_voice_dir() -> str:
     """Directory holding the bundled Piper voice model (works source + frozen)."""
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "piper_voices")
+
+
+def _kokoro_dir() -> str:
+    """models/kokoro next to the executable (frozen) or under the project root (source)."""
+    if os.environ.get("GUARDIAN_KOKORO_DIR"):
+        return os.environ["GUARDIAN_KOKORO_DIR"]
+    import sys
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(base, "models", "kokoro")
 
 
 def _play_wav(wav_path: str) -> bool:
@@ -112,6 +160,7 @@ class VoiceInterface:
         # Initialize components
         self.tts_engine = None
         self.piper_voice = None
+        self.kokoro = None
         self.recognizer = None
         
         self._initialize_tts()
@@ -121,9 +170,25 @@ class VoiceInterface:
         """
         Initialize text-to-speech engine.
 
-        Prefers Piper (neural, offline); falls back to pyttsx3 (SAPI5) if Piper
-        or its voice model is unavailable.
+        Prefers Kokoro (most natural), then Piper (fast), then pyttsx3 — all offline.
         """
+        if KOKORO_AVAILABLE and TTS_PREFERENCE == "kokoro":
+            try:
+                kdir = _kokoro_dir()
+                model = next((os.path.join(kdir, m) for m in KOKORO_MODELS
+                              if os.path.exists(os.path.join(kdir, m))), None)
+                voices = os.path.join(kdir, "voices-v1.0.bin")
+                if model is None or not os.path.exists(voices):
+                    raise FileNotFoundError(f"Kokoro model files not found in {kdir}")
+                self.kokoro = Kokoro(model, voices)
+                self.logger.info(f"Kokoro TTS initialized ({os.path.basename(model)}, voice {KOKORO_VOICE})")
+                _voice_log(f"TTS engine: kokoro ({KOKORO_VOICE})")
+                return
+            except Exception as e:
+                self.logger.warning(f"Kokoro TTS unavailable, trying Piper: {e}")
+                _voice_log(f"Kokoro TTS failed: {e}")
+                self.kokoro = None
+
         if PIPER_AVAILABLE:
             try:
                 model = os.path.join(_piper_voice_dir(), PIPER_VOICE_NAME + ".onnx")
@@ -206,8 +271,9 @@ class VoiceInterface:
         if not text or not text.strip():
             return False
 
-        if getattr(self, "piper_voice", None):
-            return self._speak_piper(text)
+        if self.kokoro is not None or getattr(self, "piper_voice", None):
+            path = self.synthesize(text)
+            return self.play_file(path) if path else False
 
         if not self.tts_engine:
             self.logger.warning(f"TTS not available. Would speak: {text}")
@@ -223,28 +289,56 @@ class VoiceInterface:
             self.logger.error(f"Failed to speak: {e}")
             return False
 
-    def _speak_piper(self, text: str) -> bool:
-        """Synthesize with Piper and play the resulting WAV."""
+    @property
+    def can_prepare_audio(self) -> bool:
+        """True when speech can be synthesized ahead of playback (Kokoro/Piper, not pyttsx3)."""
+        return self.kokoro is not None or self.piper_voice is not None
+
+    def synthesize(self, text: str) -> Optional[str]:
+        """Render text to a temporary WAV (loudness-boosted) and return its path, or None.
+
+        Split from playback so callers can prepare the next sentence while the current one
+        plays; Kokoro on a Pi 5 renders at about real time, so this keeps speech continuous.
+        """
         import wave as _wave
         import tempfile as _tempfile
 
-        wav_path = None
+        fd, wav_path = _tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
         try:
-            fd, wav_path = _tempfile.mkstemp(suffix=".wav")
-            os.close(fd)
-            self.logger.info(f"Speaking (Piper): {text}")
-            with _wave.open(wav_path, "wb") as wav_file:
-                self.piper_voice.synthesize_wav(text, wav_file)
-            return _play_wav(wav_path)
+            if self.kokoro is not None:
+                import numpy as np
+                lang = "en-gb" if KOKORO_VOICE.startswith("b") else "en-us"
+                samples, rate = self.kokoro.create(text, voice=KOKORO_VOICE, speed=1.0, lang=lang)
+                with _wave.open(wav_path, "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(rate)
+                    wf.writeframes((np.clip(samples, -1, 1) * 32767).astype(np.int16).tobytes())
+            else:
+                with _wave.open(wav_path, "wb") as wav_file:
+                    self.piper_voice.synthesize_wav(text, wav_file)
+            _boost_loudness(wav_path, VOICE_GAIN)
+            return wav_path
         except Exception as e:
-            self.logger.error(f"Failed to speak (Piper): {e}")
-            return False
+            self.logger.error(f"Failed to synthesize speech: {e}")
+            self._remove(wav_path)
+            return None
+
+    def play_file(self, wav_path: str) -> bool:
+        """Play a WAV from synthesize() and delete it."""
+        try:
+            return _play_wav(wav_path)
         finally:
-            if wav_path and os.path.exists(wav_path):
-                try:
-                    os.unlink(wav_path)
-                except OSError:
-                    pass
+            self._remove(wav_path)
+
+    @staticmethod
+    def _remove(path: str) -> None:
+        try:
+            if path and os.path.exists(path):
+                os.unlink(path)
+        except OSError:
+            pass
     
     def listen(self, timeout: int = 5, phrase_time_limit: int = 10) -> Optional[str]:
         """
@@ -311,6 +405,9 @@ class VoiceInterface:
             List of available voice IDs and names
         """
         voices = []
+        if self.kokoro is not None:
+            voices += [{'id': v, 'name': v, 'languages': ['en-GB' if v.startswith('b') else 'en-US']}
+                       for v in self.kokoro.get_voices() if v[:1] in ('a', 'b')]
         if getattr(self, "piper_voice", None):
             voices.append({
                 'id': PIPER_VOICE_NAME,
@@ -334,7 +431,7 @@ class VoiceInterface:
         self.logger.info("Testing voice interface...")
         
         # Test TTS
-        if self.tts_engine or getattr(self, "piper_voice", None):
+        if self.tts_engine or self.can_prepare_audio:
             self.speak("Guardian Node voice interface test. Text to speech is working.")
         else:
             self.logger.warning("TTS not available for testing")
