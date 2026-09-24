@@ -14,15 +14,15 @@ llm:
   docker_runner:
     enabled: false
     api_url: "http://localhost:8000"
-    model_name: "phi-3-mini"
+    model_name: "phi-4-mini"
   
   # Local LLM models configuration
   # TODO: Download models and place them in the models/ directory
   # Models can be obtained from HuggingFace or similar sources
   models:
     default:
-      path: "models/Phi-3-mini-4k-instruct-q4.gguf"
-      context_length: 4096
+      path: "models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+      context_length: 8192
       threads: 4
       age_groups: ["adult", "teen", "child"]
       contexts: ["general", "security", "education"]
@@ -35,8 +35,8 @@ llm:
       contexts: ["security", "threat_analysis"]
     
     family_assistant:
-      path: "models/Phi-3-mini-4k-instruct-q4.gguf"
-      context_length: 4096
+      path: "models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+      context_length: 8192
       threads: 4
       age_groups: ["child", "teen"]
       contexts: ["education", "child_safety", "device_guidance"]

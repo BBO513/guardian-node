@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to download the Phi-3-mini-4k-instruct-q4.gguf model
+# Script to download the microsoft_Phi-4-mini-instruct-Q4_K_M.gguf model
 
 set -e
 
@@ -7,10 +7,10 @@ set -e
 mkdir -p models
 
 # Model URL
-MODEL_URL="https://huggingface.co/microsoft/phi-3-mini-4k-instruct/resolve/main/phi-3-mini-4k-instruct-q4.gguf"
-MODEL_PATH="models/phi-3-mini-4k-instruct-q4.gguf"
+MODEL_URL="https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+MODEL_PATH="models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
 
-echo "Downloading Phi-3-mini-4k-instruct-q4.gguf model..."
+echo "Downloading microsoft_Phi-4-mini-instruct-Q4_K_M.gguf model..."
 echo "This may take a while depending on your internet connection."
 
 # Check if wget is available

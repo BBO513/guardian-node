@@ -66,8 +66,8 @@ For Docker-based installation, refer to the main README.md file in the repositor
 
 ## Manual Model Download
 
-If the automatic model download fails, you can manually download the Phi-3-mini-4k-instruct-q4.gguf model from:
-https://huggingface.co/microsoft/phi-3-mini-4k-instruct/resolve/main/phi-3-mini-4k-instruct-q4.gguf
+If the automatic model download fails, you can manually download the microsoft_Phi-4-mini-instruct-Q4_K_M.gguf model from:
+https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf
 
 Place the downloaded file in the `models/` directory and update the `config.yaml` file to point to the model path.
 
@@ -77,7 +77,7 @@ Edit the `config.yaml` file to customize the Guardian Node:
 
 ```yaml
 llm:
-  model_path: "models/phi-3-mini-4k-instruct-q4.gguf"  # Path to your GGUF model file
+  model_path: "models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"  # Path to your GGUF model file
 ```
 
 ## Troubleshooting

@@ -1,4 +1,4 @@
-# Script to download the Phi-3-mini-4k-instruct-q4.gguf model
+# Script to download the microsoft_Phi-4-mini-instruct-Q4_K_M.gguf model
 # PowerShell version
 
 # Create models directory if it doesn't exist
@@ -7,10 +7,10 @@ if (-not (Test-Path -Path "models")) {
 }
 
 # Model URL
-$MODEL_URL = "https://huggingface.co/microsoft/phi-3-mini-4k-instruct/resolve/main/phi-3-mini-4k-instruct-q4.gguf"
-$MODEL_PATH = "models/phi-3-mini-4k-instruct-q4.gguf"
+$MODEL_URL = "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+$MODEL_PATH = "models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
 
-Write-Host "Downloading Phi-3-mini-4k-instruct-q4.gguf model..."
+Write-Host "Downloading microsoft_Phi-4-mini-instruct-Q4_K_M.gguf model..."
 Write-Host "This may take a while depending on your internet connection."
 
 try {

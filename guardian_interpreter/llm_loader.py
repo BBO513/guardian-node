@@ -31,7 +31,7 @@ class GuardianLLMLoader:
     def __init__(self):
         self.models_dir = os.getenv('GUARDIAN_MODELS_DIR', '/app/models')
         self.default_model_path = os.getenv('GUARDIAN_LLM_MODEL_PATH',
-                                           '/app/models/phi-3-mini-4k-instruct-q4.gguf')
+                                           '/app/models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf')
         self.current_model = None
         self.available_models: Dict[str, ModelInfo] = {}
         self.max_memory_mb = int(os.getenv('GUARDIAN_MAX_MEMORY_MB', '2048'))

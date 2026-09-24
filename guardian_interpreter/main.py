@@ -61,8 +61,8 @@ class GuardianCLI:
         # Default configuration
         return {
             'llm': {
-                'model_path': 'models/guardian-model.gguf',
-                'context_length': 4096,
+                'model_path': 'models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf',
+                'context_length': 8192,
                 'max_tokens': 512,
                 'temperature': 0.7,
                 'threads': 4

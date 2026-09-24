@@ -5,7 +5,9 @@ Production-ready PySide6 interface for Raspberry Pi touchscreen deployment
 
 import sys
 import os
+import html
 import logging
+import urllib.request
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable
 from pathlib import Path
@@ -30,6 +32,36 @@ except ImportError:
         def get_system_status_level(self, stats): return 'normal'
         def stop(self): pass
 
+
+# Import the LLM backend. It lazily imports llama_cpp (with a MockLLM fallback
+# if the native library is unavailable), so this is safe in every environment.
+try:
+    from guardian_interpreter.llm_integration import create_llm as _create_llm
+except ImportError:
+    _create_llm = None
+
+
+def create_llm(config, logger):
+    if _create_llm is None:
+        raise RuntimeError(
+            "LLM integration unavailable (guardian_interpreter.llm_integration missing)"
+        )
+    return _create_llm(config, logger)
+
+
+# Import the voice interface (offline STT via pocketsphinx, TTS via pyttsx3).
+try:
+    from guardian_interpreter.voice.voice_interface import VoiceInterface
+except Exception:
+    VoiceInterface = None
+
+
+def resource_path(relative_path: str) -> str:
+    """Resolve a bundled resource path (works both frozen and in source)."""
+    base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, relative_path)
+
+
 class GuardianModeUI(QWidget):
     """Main mode switching interface with themed graphics"""
     
@@ -40,9 +72,9 @@ class GuardianModeUI(QWidget):
         super().__init__(parent)
         self.current_mode = "Kids"  # Default safe mode
         self.image_paths = {
-            "Adult": "assets/adult_mode.png",
-            "Kids": "assets/kids_mode.png", 
-            "Teens": "assets/teens_mode.png"
+            "Adult": "Adult_parent_mode.png",
+            "Kids": "Nodie_kids_mode.png",
+            "Teens": "Young_teens_mode.png"
         }
         
         self.setup_ui()
@@ -139,8 +171,12 @@ class GuardianModeUI(QWidget):
         
         # Update image
         img_path = self.image_paths.get(mode)
+        if img_path:
+            img_path = resource_path(os.path.join("assets", img_path))
+        pixmap = None
         if img_path and os.path.exists(img_path):
             pixmap = QPixmap(img_path)
+        if pixmap is not None and not pixmap.isNull():
             scaled_pixmap = pixmap.scaled(
                 self.img_label.size(), 
                 Qt.KeepAspectRatio, 
@@ -323,6 +359,204 @@ class SystemStatusWidget(QWidget):
         """)
 
 
+class ChatPanel(QWidget):
+    """Scrollable conversation history plus a text input for talking to the AI."""
+
+    message_submitted = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        title = QLabel("💬 Chat with Guardian")
+        title.setFont(QFont("Arial", 16, QFont.Bold))
+        title.setStyleSheet("color: #2E7D32;")
+        layout.addWidget(title)
+
+        self.history = QTextEdit()
+        self.history.setReadOnly(True)
+        self.history.setStyleSheet("""
+            QTextEdit {
+                background-color: #ffffff;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 6px;
+                font-size: 13px;
+            }
+        """)
+        layout.addWidget(self.history, 1)
+
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: #888; font-style: italic;")
+        layout.addWidget(self.status_label)
+
+        input_row = QHBoxLayout()
+        input_row.setSpacing(6)
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("Ask about your family's online safety...")
+        self.input.setFixedHeight(34)
+        self.send_btn = QPushButton("Send")
+        self.send_btn.setFixedHeight(34)
+        self.send_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50; color: white; border: none;
+                border-radius: 6px; padding: 0 16px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        input_row.addWidget(self.input, 1)
+        input_row.addWidget(self.send_btn)
+        layout.addLayout(input_row)
+
+        self.setLayout(layout)
+
+        self.input.returnPressed.connect(self._send)
+        self.send_btn.clicked.connect(self._send)
+
+    def _send(self):
+        text = self.input.text().strip()
+        if text:
+            self.input.clear()
+            self.message_submitted.emit(text)
+
+    def append_user(self, text: str):
+        self._append("You", text, "#1565C0")
+
+    def append_assistant(self, text: str):
+        self._append("Guardian", text, "#2E7D32")
+
+    def append_system(self, text: str):
+        self._append("System", text, "#757575")
+
+    def _append(self, speaker: str, text: str, color: str):
+        safe = html.escape(text)
+        self.history.append(
+            f'<p style="margin:4px 0;"><span style="color:{color}; font-weight:bold;">'
+            f'{speaker}:</span> <span style="white-space:pre-wrap;">{safe}</span></p>'
+        )
+        scrollbar = self.history.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def set_thinking(self, thinking: bool):
+        self.send_btn.setEnabled(not thinking)
+        self.input.setEnabled(not thinking)
+        if thinking:
+            self.status_label.setText("🤔 Guardian is thinking...")
+            self.status_label.setStyleSheet("color: #FF9800; font-style: italic;")
+        else:
+            self.status_label.setText("")
+            self.status_label.setStyleSheet("color: #888; font-style: italic;")
+
+    def set_status(self, text: str):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet("color: #888; font-style: italic;")
+
+
+class ModelLoadThread(QThread):
+    """Loads the GGUF model in the background so the UI stays responsive."""
+
+    loaded = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, config, parent=None):
+        super().__init__(parent)
+        self.config = config
+
+    def run(self):
+        try:
+            logger = logging.getLogger('guardian.llm')
+            llm = create_llm(self.config, logger)
+            if llm.is_loaded():
+                self.loaded.emit(llm)
+            else:
+                self.failed.emit("Model could not be loaded (file missing or unreadable).")
+        except Exception as e:
+            self.failed.emit(str(e))
+
+
+class InferenceThread(QThread):
+    """Runs a single prompt against the loaded model without freezing the UI."""
+
+    finished = Signal(str)
+    error = Signal(str)
+
+    def __init__(self, llm, prompt, parent=None):
+        super().__init__(parent)
+        self.llm = llm
+        self.prompt = prompt
+
+    def run(self):
+        try:
+            self.finished.emit(self.llm.generate_response(self.prompt))
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class VoiceSessionThread(QThread):
+    """Runs listen -> transcribe -> generate -> speak off the UI thread."""
+
+    status = Signal(str)
+    finished = Signal(str, str)  # (transcribed_text, response)
+
+    def __init__(self, voice_interface, llm, parent=None):
+        super().__init__(parent)
+        self.voice_interface = voice_interface
+        self.llm = llm
+
+    def run(self):
+        try:
+            self.status.emit("listening")
+            text = self.voice_interface.listen(timeout=5)
+            if not text:
+                self.finished.emit("", "")
+                return
+
+            self.status.emit("processing")
+            response = None
+            if self.llm is not None and self.llm.is_loaded():
+                response = self.llm.generate_response(text)
+
+            self.status.emit("speaking")
+            if response:
+                try:
+                    self.voice_interface.speak(response)
+                except Exception as e:
+                    print(f"Speak failed: {e}")
+            self.finished.emit(text, response or "")
+        except Exception as e:
+            print(f"Voice session error: {e}")
+            self.finished.emit("", "")
+
+
+class GuardianBackend:
+    """Minimal guardian backend for the standalone GUI.
+
+    Provides the voice_interface + run_query surface that the rest of the GUI
+    expects on `self.guardian`, so the packaged app is not left with None.
+    """
+
+    def __init__(self, window):
+        self._window = window
+        self.voice_interface = None
+        if VoiceInterface is not None:
+            try:
+                self.voice_interface = VoiceInterface()
+            except Exception as e:
+                print(f"Voice interface unavailable: {e}")
+                self.voice_interface = None
+
+    def run_query(self, text):
+        llm = self._window.llm
+        if llm is not None and llm.is_loaded():
+            return llm.generate_response(text)
+        return None
+
+
 class GuardianMainWindow(QMainWindow):
     """Main Guardian Node application window"""
     
@@ -332,14 +566,28 @@ class GuardianMainWindow(QMainWindow):
         self.resource_monitor = ResourceMonitor()
         self.current_mode = "Kids"
         self.voice_privacy_enabled = True
+        self.llm = None
+        self.llm_loading = False
+        self.llm_error = None
+        self._llm_thread = None
+        self._infer_thread = None
+        self._voice_thread = None
+
+        # The standalone (packaged) app has no external guardian; provide a real
+        # backend so voice_interface and run_query are available, not None.
+        if self.guardian is None:
+            self.guardian = GuardianBackend(self)
         
         self.setup_ui()
         self.setup_mode_integration()
+        self.setup_chat_integration()
+        self.start_model_loading()
     
     def setup_ui(self):
         """Setup main window UI"""
         self.setWindowTitle("Guardian Node - Family Protection")
-        self.setFixedSize(800, 480)  # Optimized for Raspberry Pi touchscreen
+        self.resize(1180, 720)
+        self.setMinimumSize(940, 620)
         
         # Central widget with stacked layout
         central_widget = QWidget()
@@ -350,6 +598,9 @@ class GuardianMainWindow(QMainWindow):
         
         # System status widget
         self.status_widget = SystemStatusWidget(self.resource_monitor)
+        
+        # Chat interface
+        self.chat = ChatPanel()
         
         # Main layout
         main_layout = QHBoxLayout()
@@ -411,8 +662,9 @@ class GuardianMainWindow(QMainWindow):
         right_layout.addWidget(self.voice_privacy_btn)
         
         # Add layouts to main layout
-        main_layout.addLayout(left_layout, 2)  # 2/3 of space
-        main_layout.addLayout(right_layout, 1)  # 1/3 of space
+        main_layout.addLayout(left_layout, 2)  # Mode switching
+        main_layout.addWidget(self.chat, 3)    # Chat (main interaction)
+        main_layout.addLayout(right_layout, 2) # Status and controls
         main_layout.setContentsMargins(10, 10, 10, 10)
         
         central_widget.setLayout(main_layout)
@@ -436,6 +688,55 @@ class GuardianMainWindow(QMainWindow):
     def setup_mode_integration(self):
         """Setup mode change integration with backend"""
         self.mode_ui.mode_changed.connect(self.handle_mode_change)
+
+    def setup_chat_integration(self):
+        """Connect the chat panel to the LLM response pipeline."""
+        self.chat.message_submitted.connect(self._on_chat_message)
+
+    def start_model_loading(self):
+        """Load the LLM in a background thread and surface status in the chat."""
+        self.llm_loading = True
+        self.chat.set_status("Loading AI model...")
+        self._llm_thread = ModelLoadThread(get_llm_config())
+        self._llm_thread.loaded.connect(self._on_model_loaded)
+        self._llm_thread.failed.connect(self._on_model_failed)
+        self._llm_thread.start()
+
+    def _on_model_loaded(self, llm):
+        self.llm = llm
+        self.llm_loading = False
+        self.chat.set_status("")
+        self.chat.append_system("Guardian AI is ready. Ask me anything!")
+
+    def _on_model_failed(self, err: str):
+        self.llm_loading = False
+        self.llm_error = err
+        self.chat.set_status("AI model unavailable")
+        self.chat.append_system(f"Could not load the AI model: {err}")
+
+    def _on_chat_message(self, text: str):
+        if not text.strip():
+            return
+        self.chat.append_user(text)
+        if self.llm is None:
+            if self.llm_loading:
+                self.chat.append_system("The AI model is still loading — please wait a moment and try again.")
+            else:
+                self.chat.append_system("The AI model isn't loaded, so I can't answer right now.")
+            return
+        self.chat.set_thinking(True)
+        self._infer_thread = InferenceThread(self.llm, text)
+        self._infer_thread.finished.connect(self._on_inference_done)
+        self._infer_thread.error.connect(self._on_inference_error)
+        self._infer_thread.start()
+
+    def _on_inference_done(self, response: str):
+        self.chat.set_thinking(False)
+        self.chat.append_assistant(response)
+
+    def _on_inference_error(self, err: str):
+        self.chat.set_thinking(False)
+        self.chat.append_system(f"Sorry, something went wrong: {err}")
     
     def handle_mode_change(self, mode: str):
         """Handle mode changes and integrate with backend"""
@@ -489,33 +790,43 @@ class GuardianMainWindow(QMainWindow):
         QTimer.singleShot(3000, lambda: self.status_widget.status_label.setText("🟢 Security scan complete"))
     
     def start_voice_session(self):
-        """Start voice assistant session"""
-        # Update status
+        """Start voice assistant session (listen -> transcribe -> answer -> speak)."""
         print("Starting voice session...")
-        self.status_widget.status_label.setText("🎤 Listening...")
-        self.status_widget.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-        
-        # Check if guardian has voice interface
-        if self.guardian and hasattr(self.guardian, 'voice_interface') and self.guardian.voice_interface:
-            try:
-                # Listen for voice input
-                text = self.guardian.voice_interface.listen(timeout=5)
-                
-                if text:
-                    print(f"Voice input: {text}")
-                    # Process the voice query through the guardian
-                    self.guardian.run_query(text)
-                    self.status_widget.status_label.setText("🟢 Voice command completed")
-                else:
-                    self.status_widget.status_label.setText("🔴 No speech detected")
-            except Exception as e:
-                print(f"Voice session error: {e}")
-                self.status_widget.status_label.setText("🔴 Voice command failed")
-        else:
+        voice_interface = getattr(self.guardian, 'voice_interface', None)
+
+        if not voice_interface:
             print("Voice interface not available")
             self.status_widget.status_label.setText("🔴 Voice not available")
-            
-        # Reset status after 3 seconds
+            return
+
+        self.status_widget.status_label.setText("🎤 Listening...")
+        self.status_widget.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+
+        self._voice_thread = VoiceSessionThread(voice_interface, self.llm)
+        self._voice_thread.status.connect(self._on_voice_status)
+        self._voice_thread.finished.connect(self._on_voice_done)
+        self._voice_thread.start()
+
+    def _on_voice_status(self, state: str):
+        mapping = {
+            "listening": ("🎤 Listening...", "#4CAF50"),
+            "processing": ("🤔 Thinking...", "#FF9800"),
+            "speaking": ("🔊 Speaking...", "#2196F3"),
+        }
+        text, color = mapping.get(state, (state, "#888"))
+        self.status_widget.status_label.setText(text)
+        self.status_widget.status_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+
+    def _on_voice_done(self, text: str, response: str):
+        if text:
+            self.chat.append_user(text)
+            if response:
+                self.chat.append_assistant(response)
+                self.status_widget.status_label.setText("🟢 Voice command completed")
+            else:
+                self.status_widget.status_label.setText("🟡 Heard you, but the AI model wasn't ready")
+        else:
+            self.status_widget.status_label.setText("🔴 No speech detected")
         QTimer.singleShot(3000, lambda: self.status_widget.update_status())
     
     def toggle_voice_privacy(self):
@@ -731,6 +1042,203 @@ def create_guardian_gui(guardian_interpreter=None):
     return app, window
 
 
+# ---------------------------------------------------------------------------
+# First-launch model download
+# ---------------------------------------------------------------------------
+
+MODEL_FILENAME = "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+MODEL_REPO = "bartowski/microsoft_Phi-4-mini-instruct-GGUF"
+MODEL_URL = f"https://huggingface.co/{MODEL_REPO}/resolve/main/{MODEL_FILENAME}"
+MODEL_SIZE_GB = 2.3
+# Anything smaller than this is treated as an incomplete/corrupt download.
+MODEL_MIN_BYTES = 100 * 1024 * 1024
+
+
+def get_models_dir() -> str:
+    """Return the writable models/ directory.
+
+    When frozen (PyInstaller onefile) the model lives in a `models` folder next
+    to the executable; in source it lives in `models/` under the project root.
+    """
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, 'models')
+
+
+def get_model_path() -> str:
+    return os.path.join(get_models_dir(), MODEL_FILENAME)
+
+
+def get_llm_config() -> dict:
+    """Build the llm config dict consumed by create_llm.
+
+    context_length/threads are left configurable via environment variables so
+    users with more RAM can raise the context window.
+    """
+    return {
+        'llm': {
+            'model_path': get_model_path(),
+            'context_length': int(os.environ.get('GUARDIAN_CONTEXT_LENGTH', '8192')),
+            'threads': int(os.environ.get('GUARDIAN_THREADS', '4')),
+            'max_tokens': 512,
+            'temperature': 0.7,
+        }
+    }
+
+
+def model_is_present() -> bool:
+    """Return True if a complete model file already exists."""
+    path = get_model_path()
+    try:
+        return os.path.exists(path) and os.path.getsize(path) >= MODEL_MIN_BYTES
+    except OSError:
+        return False
+
+
+class ModelDownloadThread(QThread):
+    """Streams the model file to disk in the background, emitting progress."""
+
+    progress_mb = Signal(float)
+    finished_ok = Signal()
+    error = Signal(str)
+
+    def __init__(self, url: str, dest: str, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.dest = dest
+        self._cancelled = False
+
+    def run(self):
+        tmp = self.dest + ".part"
+        try:
+            os.makedirs(os.path.dirname(self.dest), exist_ok=True)
+            req = urllib.request.Request(self.url, headers={'User-Agent': 'GuardianNode/1.0'})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                done = 0
+                with open(tmp, 'wb') as f:
+                    while not self._cancelled:
+                        chunk = resp.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        done += len(chunk)
+                        self.progress_mb.emit(done / (1024 * 1024))
+            if self._cancelled:
+                self.error.emit("Download cancelled.")
+                return
+            os.replace(tmp, self.dest)
+            self.finished_ok.emit()
+        except Exception as e:
+            self.error.emit(str(e))
+
+    def cancel(self):
+        self._cancelled = True
+
+
+class ModelDownloadDialog(QDialog):
+    """Simple first-launch screen to download the AI model."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Guardian Node - AI Model Setup")
+        self.setFixedSize(520, 280)
+        self._thread = None
+
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+
+        title = QLabel("Welcome to Guardian Node")
+        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Arial", 18, QFont.Bold))
+        title.setStyleSheet("color: #2E7D32;")
+        layout.addWidget(title)
+
+        message = QLabel(
+            "Guardian Node needs to download its AI model "
+            f"({MODEL_SIZE_GB:.1f} GB, one-time, works offline after this)."
+        )
+        message.setWordWrap(True)
+        message.setAlignment(Qt.AlignCenter)
+        message.setFont(QFont("Arial", 11))
+        layout.addWidget(message)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setFormat("%p%")
+        layout.addWidget(self.progress)
+
+        self.status = QLabel("Ready to download.")
+        self.status.setAlignment(Qt.AlignCenter)
+        self.status.setFont(QFont("Arial", 10))
+        layout.addWidget(self.status)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        self.download_btn = QPushButton("Download")
+        self.download_btn.setFixedHeight(40)
+        self.download_btn.setStyleSheet(
+            "QPushButton { background-color: #4CAF50; color: white; border: none; "
+            "border-radius: 8px; font-size: 14px; font-weight: bold; }"
+        )
+        self.skip_btn = QPushButton("Skip for now")
+        self.skip_btn.setFixedHeight(40)
+        btn_layout.addWidget(self.download_btn)
+        btn_layout.addWidget(self.skip_btn)
+        layout.addLayout(btn_layout)
+
+        self.setLayout(layout)
+
+        self.download_btn.clicked.connect(self.start_download)
+        self.skip_btn.clicked.connect(self.reject)
+
+    def start_download(self):
+        self.download_btn.setEnabled(False)
+        self.skip_btn.setEnabled(False)
+        self.status.setText("Downloading...")
+
+        self._thread = ModelDownloadThread(MODEL_URL, get_model_path(), self)
+        self._thread.progress_mb.connect(self._on_progress)
+        self._thread.finished_ok.connect(self._on_finished)
+        self._thread.error.connect(self._on_error)
+        self._thread.start()
+
+    def _on_progress(self, mb: float):
+        self.progress.setValue(min(100, int(mb / (MODEL_SIZE_GB * 1024))))
+        self.status.setText(f"Downloaded {mb:.0f} MB of ~{MODEL_SIZE_GB * 1024:.0f} MB...")
+
+    def _on_finished(self):
+        self.status.setText("Download complete.")
+        self.accept()
+
+    def _on_error(self, msg: str):
+        self.download_btn.setEnabled(True)
+        self.skip_btn.setEnabled(True)
+        self.progress.setValue(0)
+        self.status.setText(f"Download failed: {msg}")
+
+    def closeEvent(self, event):
+        if self._thread and self._thread.isRunning():
+            self._thread.cancel()
+            self._thread.wait(2000)
+        event.accept()
+
+
+def ensure_model_available(parent=None) -> bool:
+    """Show the download dialog on first launch if the model is missing.
+
+    Returns True once a complete model is present (or was just downloaded).
+    """
+    if model_is_present():
+        return True
+
+    dialog = ModelDownloadDialog(parent)
+    dialog.exec()
+    return model_is_present()
+
+
 def main():
     """Application entry point"""
     # Configure basic logging
@@ -738,19 +1246,20 @@ def main():
         level=logging.INFO, 
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
-    # Ensure assets directory exists
-    os.makedirs("assets", exist_ok=True)
-    
-    # Create placeholder images if they don't exist
-    for mode in ["adult", "kids", "teens"]:
-        img_path = f"assets/{mode}_mode.png"
-        if not os.path.exists(img_path):
-            # In production, use real images
-            open(img_path, 'wb').close()
-    
-    # Create and run application
-    app, window = create_guardian_gui()
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("Guardian Node")
+    app.setApplicationVersion("1.0")
+
+    # First-launch: offer to download the AI model if it is missing.
+    ensure_model_available()
+
+    # Create and show the main window (works with or without the model).
+    window = GuardianMainWindow()
+    if os.environ.get('RASPBERRY_PI', '0') == '1':
+        window.showFullScreen()
+    else:
+        window.show()
     sys.exit(app.exec())
 
 

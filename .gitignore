@@ -103,3 +103,7 @@ data/*.csv
 # Configuration overrides (keep template)
 config.local.yaml
 secrets.yaml
+
+# Local backups (large, never commit)
+Found backup of guardian_node/
+guardian_node_v1/

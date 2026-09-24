@@ -18,4 +18,4 @@ Write-Host "Activating virtual environment..."
 Write-Host "Installing dependencies..."
 pip install -r requirements.txt
 
-Write-Host "Setup complete. Copy Phi-3-mini-4k-instruct-q4.gguf to models\ manually."
+Write-Host "Setup complete. Copy microsoft_Phi-4-mini-instruct-Q4_K_M.gguf to models\ manually."

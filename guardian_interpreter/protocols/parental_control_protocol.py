@@ -32,34 +32,33 @@ def analyze(target: Optional[str] = None, **kwargs) -> Dict[str, Any]:
     
     try:
         family_profile = kwargs.get('family_profile', {})
+        check_type = kwargs.get('check_type')
         
-        # Content filtering
-        if kwargs.get('check_content_filtering', True):
-            findings.extend(_analyze_content_filtering(family_profile))
+        check_functions = {
+            'content_filtering': _analyze_content_filtering,
+            'device_monitoring': _analyze_device_monitoring,
+            'time_restrictions': _analyze_time_restrictions,
+            'social_media_privacy': _analyze_social_media_privacy,
+        }
         
-        # Device monitoring
-        if kwargs.get('check_device_monitoring', True):
-            findings.extend(_analyze_device_monitoring(family_profile))
+        if check_type in check_functions:
+            to_run = [check_functions[check_type]]
+        elif check_type is None or check_type == 'all':
+            to_run = list(check_functions.values())
+        else:
+            to_run = []
         
-        # Time restrictions
-        if kwargs.get('check_time_restrictions', True):
-            findings.extend(_analyze_time_restrictions(family_profile))
+        for fn in to_run:
+            result = fn(family_profile)
+            findings.extend(result.get('findings', []))
+            recommendations.extend(result.get('recommendations', []))
+            technical_details.update(result.get('technical_details', {}) or {})
         
-        # Social media privacy
-        if kwargs.get('check_social_media_privacy', True):
-            findings.extend(_analyze_social_media_privacy(family_profile))
-        
-        recommendations = _generate_parental_control_recommendations(findings, family_profile)
         status = _determine_overall_status(findings)
         
         technical_details.update({
-            'checks_performed': {
-                'content_filtering': kwargs.get('check_content_filtering', True),
-                'device_monitoring': kwargs.get('check_device_monitoring', True),
-                'time_restrictions': kwargs.get('check_time_restrictions', True),
-                'social_media_privacy': kwargs.get('check_social_media_privacy', True)
-            },
-            'family_profile_provided': bool(family_profile),
+            'checks_performed': [name for name, f in check_functions.items() if f in to_run],
+            'family_profile_provided': bool(kwargs.get('family_profile')),
             'analysis_timestamp': datetime.now().isoformat()
         })
         
@@ -73,19 +72,57 @@ def analyze(target: Optional[str] = None, **kwargs) -> Dict[str, Any]:
     except Exception as e:
         return {
             'status': 'error',
-            'findings': [],
+            'findings': [_create_finding(
+                severity='high',
+                title='Analysis Error',
+                description=f'Parental control analysis could not complete: {str(e)}',
+                recommendation='Check logs and retry the analysis.'
+            )],
             'recommendations': [f'Parental control analysis failed: {str(e)}'],
             'technical_details': {'error': str(e)}
         }
 
-def _analyze_content_filtering(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _analyze_content_filtering(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze content filtering systems and settings."""
     findings = []
+    recommendations = []
+    technical_details = {}
     
     try:
-        findings.extend(_check_dns_filtering(family_profile))
-        findings.extend(_check_parental_control_software(family_profile))
-        findings.extend(_check_builtin_parental_controls(family_profile))
+        dns_result = _check_dns_filtering(family_profile)
+        software_result = _check_parental_control_software(family_profile)
+        technical_details['dns_filtering'] = dns_result
+        technical_details['parental_control_software'] = software_result
+        
+        if dns_result.get('filtered_dns'):
+            findings.append(_create_finding(
+                'info', 'DNS Filtering Active',
+                f"Family-safe DNS detected: {dns_result.get('service')}",
+                'Continue using family-safe DNS and regularly review filtering settings'
+            ))
+            recommendations.append(f"DNS filtering is active via {dns_result.get('service')}")
+        else:
+            findings.append(_create_finding(
+                'medium', 'No DNS Filtering Detected',
+                'System is not using family-safe DNS filtering',
+                'Consider switching to a family-safe DNS service'
+            ))
+            recommendations.append('Consider switching to a family-safe DNS service')
+        
+        if software_result.get('detected'):
+            findings.append(_create_finding(
+                'info', 'Parental Control Software Found',
+                f"Detected: {', '.join(software_result.get('software', []))}",
+                'Keep parental control software properly configured and up to date'
+            ))
+            recommendations.append('Parental control software is installed')
+        else:
+            findings.append(_create_finding(
+                'medium', 'No Parental Control Software',
+                'No parental control software detected',
+                'Consider installing parental control software for comprehensive family protection'
+            ))
+            recommendations.append('Consider installing parental control software')
     except Exception as e:
         findings.append(_create_finding(
             'low', 'Content Filtering Analysis Error',
@@ -94,15 +131,41 @@ def _analyze_content_filtering(family_profile: Dict[str, Any]) -> List[Dict[str,
             {'error': str(e)}
         ))
     
-    return findings
+    return {'findings': findings, 'recommendations': recommendations, 'technical_details': technical_details}
 
-def _analyze_device_monitoring(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _analyze_device_monitoring(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze device monitoring capabilities and settings."""
     findings = []
+    recommendations = []
+    technical_details = {}
     
     try:
-        findings.extend(_detect_monitoring_software(family_profile))
-        findings.extend(_check_screen_time_controls(family_profile))
+        software_list = _detect_monitoring_software(family_profile)
+        builtin = _check_builtin_parental_controls(family_profile)
+        technical_details['monitoring_software'] = software_list
+        technical_details['builtin_controls'] = builtin
+        
+        if software_list:
+            findings.append(_create_finding(
+                'info', 'Device Monitoring Active',
+                f"Monitoring software detected: {', '.join(software_list)}",
+                'Ensure monitoring software is used ethically and with family consent'
+            ))
+            recommendations.append('Device monitoring software is active')
+        else:
+            findings.append(_create_finding(
+                'info', 'No Monitoring Software Detected',
+                'No device monitoring software detected',
+                'Consider age-appropriate monitoring solutions if needed for family safety'
+            ))
+        
+        if builtin.get('enabled'):
+            findings.append(_create_finding(
+                'info', 'Built-in Controls Active',
+                f"Built-in controls available: {', '.join(builtin.get('features', []))}",
+                'Configure built-in parental controls for family protection'
+            ))
+            recommendations.append('Built-in parental controls are available')
     except Exception as e:
         findings.append(_create_finding(
             'low', 'Device Monitoring Analysis Error',
@@ -111,22 +174,45 @@ def _analyze_device_monitoring(family_profile: Dict[str, Any]) -> List[Dict[str,
             {'error': str(e)}
         ))
     
-    return findings
+    return {'findings': findings, 'recommendations': recommendations, 'technical_details': technical_details}
 
-def _analyze_time_restrictions(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _analyze_time_restrictions(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze time restriction settings and controls."""
     findings = []
+    recommendations = []
+    technical_details = {}
     
     try:
-        findings.extend(_check_screen_time_controls(family_profile))
+        screen = _check_screen_time_controls(family_profile)
+        bedtime = _check_bedtime_restrictions(family_profile)
+        apps = _check_app_time_limits(family_profile)
+        technical_details['screen_time'] = screen
+        technical_details['bedtime'] = bedtime
+        technical_details['app_limits'] = apps
         
-        if platform.system() == "Windows":
+        if screen.get('enabled'):
             findings.append(_create_finding(
-                'info', 'Time Restrictions Check',
-                'Windows Family Safety time restrictions require manual verification',
-                'Check Windows Family Safety settings for time restrictions and bedtime controls',
-                {'platform': 'Windows', 'check_type': 'manual_verification'}
+                'info', 'Screen Time Controls Active',
+                f"Screen time controls available: {', '.join(screen.get('features', []))}",
+                'Configure screen time limits through family accounts'
             ))
+            recommendations.append('Screen time controls are available')
+        
+        if bedtime.get('configured'):
+            findings.append(_create_finding(
+                'info', 'Bedtime Restrictions Set',
+                'Bedtime restrictions are configured',
+                'Review bedtime restrictions regularly'
+            ))
+            recommendations.append('Bedtime restrictions are configured')
+        
+        if apps.get('configured'):
+            findings.append(_create_finding(
+                'info', 'App Time Limits Set',
+                f"App time limits configured for: {', '.join(apps.get('apps', []))}",
+                'Review app time limits regularly'
+            ))
+            recommendations.append('App time limits are configured')
     except Exception as e:
         findings.append(_create_finding(
             'low', 'Time Restrictions Analysis Error',
@@ -135,25 +221,33 @@ def _analyze_time_restrictions(family_profile: Dict[str, Any]) -> List[Dict[str,
             {'error': str(e)}
         ))
     
-    return findings
+    return {'findings': findings, 'recommendations': recommendations, 'technical_details': technical_details}
 
-def _analyze_social_media_privacy(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _analyze_social_media_privacy(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze social media privacy settings and recommendations."""
     findings = []
+    recommendations = []
+    technical_details = {}
     
     try:
         family_members = family_profile.get('members', [])
-        if family_members:
-            findings.extend(_get_age_appropriate_social_media_guidance(family_members))
-        else:
-            findings.append(_create_finding(
-                'info', 'Social Media Privacy Guidance',
-                'General social media privacy recommendations available',
-                'Configure privacy settings on all social media platforms used by family members',
-                {'guidance_type': 'general'}
-            ))
+        guidance = _get_age_appropriate_social_media_guidance(family_members)
+        findings.extend(guidance.get('findings', []))
+        recommendations.extend(guidance.get('recommendations', []))
+        technical_details.update(guidance.get('technical_details', {}))
         
-        findings.extend(_get_platform_privacy_recommendations())
+        platform_recs = _get_platform_privacy_recommendations()
+        for platform_name, recs in platform_recs.items():
+            findings.append(_create_finding(
+                'info', f'{platform_name} Privacy Settings',
+                f'Privacy recommendations for {platform_name}',
+                recs[0] if recs else '',
+                {'platform': platform_name}
+            ))
+            for rec in recs:
+                recommendations.append(f'{platform_name}: {rec}')
+        
+        technical_details['platforms_reviewed'] = list(platform_recs.keys())
     except Exception as e:
         findings.append(_create_finding(
             'low', 'Social Media Privacy Analysis Error',
@@ -162,276 +256,159 @@ def _analyze_social_media_privacy(family_profile: Dict[str, Any]) -> List[Dict[s
             {'error': str(e)}
         ))
     
-    return findings
+    return {'findings': findings, 'recommendations': recommendations, 'technical_details': technical_details}
 
-def _check_dns_filtering(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _check_dns_filtering(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Check for DNS-based content filtering."""
-    findings = []
+    family_dns_servers = {
+        '208.67.222.123': 'OpenDNS Family Shield',
+        '208.67.220.123': 'OpenDNS Family Shield',
+        '185.228.168.168': 'CleanBrowsing Family',
+        '185.228.169.168': 'CleanBrowsing Family',
+        '1.1.1.3': 'Cloudflare for Families',
+        '1.0.0.3': 'Cloudflare for Families',
+    }
     
     try:
         system = platform.system()
-        family_dns_servers = [
-            '208.67.222.123', '208.67.220.123',  # OpenDNS FamilyShield
-            '185.228.168.168', '185.228.169.168',  # CleanBrowsing Family
-            '1.1.1.3', '1.0.0.3'  # Cloudflare for Families
-        ]
-        dns_servers = []
-        
         if system == "Windows":
             result = subprocess.run(['ipconfig', '/all'], capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                for line in result.stdout.split('\n'):
-                    if 'DNS Servers' in line:
-                        dns_servers += re.findall(r'\d+\.\d+\.\d+\.\d+', line)
-        elif system in ["Linux", "Darwin"]:
-            try:
-                with open('/etc/resolv.conf', 'r') as f:
-                    resolv_content = f.read()
-                    dns_servers += re.findall(r'nameserver\s+(\d+\.\d+\.\d+\.\d+)', resolv_content)
-            except FileNotFoundError:
-                findings.append(_create_finding(
-                    'low', 'DNS Configuration Check Failed',
-                    'Unable to read DNS configuration',
-                    'Manually check DNS settings for family-safe filtering',
-                    {'error': 'resolv.conf not found'}
-                ))
-        
-        using_family_dns = any(dns in family_dns_servers for dns in dns_servers)
-        
-        if using_family_dns:
-            findings.append(_create_finding(
-                'info', 'Family-Safe DNS Detected',
-                'System is using family-safe DNS filtering service',
-                'Continue using family-safe DNS and regularly review filtering settings',
-                {'dns_servers': dns_servers, 'family_safe': True}
-            ))
+            output = result.stdout
         else:
-            findings.append(_create_finding(
-                'medium', 'No DNS Content Filtering',
-                'System is not using family-safe DNS filtering',
-                'Consider switching to a family-safe DNS service',
-                {'dns_servers': dns_servers, 'family_safe': False}
-            ))
-    except Exception as e:
-        findings.append(_create_finding(
-            'low', 'DNS Filtering Check Error',
-            f'Unable to check DNS filtering: {str(e)}',
-            'Manually verify DNS filtering settings',
-            {'error': str(e)}
-        ))
-    
-    return findings
+            result = subprocess.run(['cat', '/etc/resolv.conf'], capture_output=True, text=True, timeout=10)
+            output = result.stdout
+        
+        dns_servers = re.findall(r'\d+\.\d+\.\d+\.\d+', output)
+        
+        for server in dns_servers:
+            if server in family_dns_servers:
+                return {
+                    'filtered_dns': True,
+                    'service': family_dns_servers[server],
+                    'dns_server': server
+                }
+        
+        return {
+            'filtered_dns': False,
+            'service': None,
+            'dns_server': dns_servers[0] if dns_servers else None
+        }
+    except Exception:
+        return {'filtered_dns': False, 'service': None, 'dns_server': None}
 
-def _check_parental_control_software(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _check_parental_control_software(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Check for installed parental control software."""
-    findings = []
+    parental_software = ['qustodio', 'norton', 'bark', 'circle', 'kaspersky', 'bitdefender']
     
     try:
         system = platform.system()
-        detected_software = []
-        
         if system == "Windows":
             result = subprocess.run(['tasklist'], capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                processes = result.stdout.lower()
-                parental_software = {
-                    'qustodio': 'Qustodio',
-                    'norton': 'Norton Family',
-                    'bark': 'Bark',
-                    'circle': 'Circle Home Plus',
-                    'kaspersky': 'Kaspersky Safe Kids',
-                    'bitdefender': 'Bitdefender Parental Control'
-                }
-                
-                for pname, sname in parental_software.items():
-                    if pname in processes:
-                        detected_software.append(sname)
-        elif system in ["Linux", "Darwin"]:
+            processes = result.stdout.lower()
+        else:
             result = subprocess.run(['ps', 'aux'], capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                processes = result.stdout.lower()
-                for pname in ['qustodio-daemon', 'circle', 'bark-agent']:
-                    if pname in processes:
-                        detected_software.append(pname)
+            processes = result.stdout.lower()
         
-        if detected_software:
-            findings.append(_create_finding(
-                'info', 'Parental Control Software Detected',
-                f'Found parental control software: {", ".join(detected_software)}',
-                'Ensure parental control software is properly configured and up to date',
-                {'detected_software': detected_software}
-            ))
-        else:
-            findings.append(_create_finding(
-                'medium', 'No Parental Control Software',
-                'No parental control software detected',
-                'Consider installing parental control software for comprehensive family protection',
-                {'detected_software': []}
-            ))
-    except Exception as e:
-        findings.append(_create_finding(
-            'low', 'Parental Control Software Check Error',
-            f'Unable to check for parental control software: {str(e)}',
-            'Manually verify parental control software installation',
-            {'error': str(e)}
-        ))
-    
-    return findings
+        detected_software = [name for name in parental_software if name in processes]
+        return {'detected': bool(detected_software), 'software': detected_software}
+    except Exception:
+        return {'detected': False, 'software': []}
 
-def _check_builtin_parental_controls(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _check_builtin_parental_controls(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Check for built-in parental control features."""
-    findings = []
+    system = platform.system()
     
-    try:
-        system = platform.system()
-        
-        if system == "Windows":
-            findings.append(_create_finding(
-                'info', 'Windows Family Safety',
-                'Windows includes built-in Family Safety features',
-                'Configure Windows Family Safety through Microsoft Family accounts for comprehensive parental controls',
-                {'platform': 'Windows', 'feature': 'Family Safety'}
-            ))
-        elif system == "Darwin":
-            findings.append(_create_finding(
-                'info', 'macOS Parental Controls',
-                'macOS includes built-in Screen Time and Parental Controls',
-                'Configure Screen Time and Parental Controls in System Preferences for family protection',
-                {'platform': 'macOS', 'feature': 'Screen Time & Parental Controls'}
-            ))
-        else:
-            findings.append(_create_finding(
-                'info', 'Built-in Parental Controls',
-                'Check your operating system for built-in parental control features',
-                'Many modern operating systems include parental control features',
-                {'platform': system}
-            ))
-    except Exception as e:
-        findings.append(_create_finding(
-            'low', 'Built-in Controls Check Error',
-            f'Unable to check built-in parental controls: {str(e)}',
-            'Manually check your operating system\'s parental control features',
-            {'error': str(e)}
-        ))
-    
-    return findings
+    if system == "Windows":
+        return {
+            'enabled': True,
+            'features': ['Windows Family Safety', 'Screen Time Management', 'Activity Reporting']
+        }
+    elif system == "Darwin":
+        return {
+            'enabled': True,
+            'features': ['macOS Screen Time', 'App Restrictions']
+        }
+    else:
+        return {'enabled': False, 'features': []}
 
-def _detect_monitoring_software(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _detect_monitoring_software(family_profile: Dict[str, Any]) -> List[str]:
     """Detect device monitoring software and capabilities."""
-    findings = []
+    monitoring_software = ['qustodio', 'bark', 'circle']
     
     try:
         system = platform.system()
-        detected_monitoring = []
-        
         if system == "Windows":
             result = subprocess.run(['tasklist'], capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                processes = result.stdout.lower()
-                monitoring_software = {
-                    'spyrix': 'Spyrix Personal Monitor',
-                    'kidlogger': 'KidLogger',
-                    'refog': 'Refog Keylogger',
-                    'mspy': 'mSpy',
-                    'flexispy': 'FlexiSpy'
-                }
-                
-                for pname, sname in monitoring_software.items():
-                    if pname in processes:
-                        detected_monitoring.append(sname)
-        
-        if detected_monitoring:
-            findings.append(_create_finding(
-                'info', 'Device Monitoring Software Detected',
-                f'Found monitoring software: {", ".join(detected_monitoring)}',
-                'Ensure monitoring software is used ethically and with family consent',
-                {'detected_monitoring': detected_monitoring}
-            ))
+            processes = result.stdout.lower()
         else:
-            findings.append(_create_finding(
-                'info', 'No Monitoring Software Detected',
-                'No device monitoring software detected',
-                'Consider age-appropriate monitoring solutions if needed for family safety',
-                {'detected_monitoring': []}
-            ))
-    except Exception as e:
-        findings.append(_create_finding(
-            'low', 'Monitoring Software Check Error',
-            f'Unable to check for monitoring software: {str(e)}',
-            'Manually review installed monitoring software',
-            {'error': str(e)}
-        ))
-    
-    return findings
+            result = subprocess.run(['ps', 'aux'], capture_output=True, text=True, timeout=10)
+            processes = result.stdout.lower()
+        
+        return [name for name in monitoring_software if name in processes]
+    except Exception:
+        return []
 
-def _check_screen_time_controls(family_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _check_screen_time_controls(family_profile: Dict[str, Any]) -> Dict[str, Any]:
     """Check for screen time control settings."""
-    findings = []
+    system = platform.system()
     
-    try:
-        system = platform.system()
-        
-        if system == "Windows":
-            findings.append(_create_finding(
-                'info', 'Windows Screen Time Controls',
-                'Windows Family Safety includes screen time management',
-                'Configure screen time limits through Microsoft Family accounts',
-                {'platform': 'Windows', 'feature': 'Family Safety Screen Time'}
-            ))
-        elif system == "Darwin":
-            findings.append(_create_finding(
-                'info', 'macOS Screen Time',
-                'macOS includes comprehensive Screen Time controls',
-                'Configure Screen Time limits and app restrictions in System Preferences',
-                {'platform': 'macOS', 'feature': 'Screen Time'}
-            ))
-        else:
-            findings.append(_create_finding(
-                'info', 'Screen Time Controls',
-                'Check available screen time control options for your platform',
-                'Many devices and platforms offer screen time management features',
-                {'platform': system}
-            ))
-    except Exception as e:
-        findings.append(_create_finding(
-            'low', 'Screen Time Check Error',
-            f'Unable to check screen time controls: {str(e)}',
-            'Manually review screen time control settings',
-            {'error': str(e)}
-        ))
-    
-    return findings
+    if system == "Windows":
+        return {
+            'enabled': True,
+            'features': ['Windows Family Features', 'Screen Time Limits']
+        }
+    elif system == "Darwin":
+        return {
+            'enabled': True,
+            'features': ['macOS Screen Time', 'App Limits']
+        }
+    else:
+        return {'enabled': False, 'features': []}
 
-def _get_age_appropriate_social_media_guidance(family_members: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _check_bedtime_restrictions(family_profile: Dict[str, Any]) -> Dict[str, Any]:
+    """Check for bedtime restriction settings."""
+    return {'configured': False}
+
+def _check_app_time_limits(family_profile: Dict[str, Any]) -> Dict[str, Any]:
+    """Check for app time limit settings."""
+    return {'configured': False, 'apps': []}
+
+def _get_age_appropriate_social_media_guidance(family_members: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Get age-appropriate social media privacy guidance."""
     findings = []
+    recommendations = []
+    age_groups = []
     
     try:
         for member in family_members:
             age_group = member.get('age_group', 'unknown')
             name = member.get('name', 'Family Member')
+            age_groups.append(age_group)
             
             if age_group == 'child':
                 findings.append(_create_finding(
                     'high', f'Child Social Media Safety - {name}',
                     'Young children should have limited or no social media access',
-                    'Consider age-appropriate alternatives and supervised usage only',
+                    f'{name}: Consider age-appropriate alternatives and supervised usage only',
                     {'age_group': 'child', 'member': name}
                 ))
+                recommendations.append(f'{name}: Consider age-appropriate alternatives and supervised usage only')
             elif age_group == 'teen':
                 findings.append(_create_finding(
                     'medium', f'Teen Social Media Privacy - {name}',
                     'Teenagers need guidance on social media privacy settings',
-                    'Review privacy settings together and discuss online safety regularly',
+                    f'{name}: Review privacy settings together and discuss online safety regularly',
                     {'age_group': 'teen', 'member': name}
                 ))
-            elif age_group == 'adult':
+                recommendations.append(f'{name}: Review privacy settings together and discuss online safety regularly')
+            else:
                 findings.append(_create_finding(
                     'info', f'Adult Social Media Privacy - {name}',
                     'Adults should model good social media privacy practices',
-                    'Regularly review and update privacy settings on all platforms',
-                    {'age_group': 'adult', 'member': name}
+                    f'{name}: Regularly review and update privacy settings on all platforms',
+                    {'age_group': age_group, 'member': name}
                 ))
+                recommendations.append(f'{name}: Regularly review and update privacy settings on all platforms')
     except Exception as e:
         findings.append(_create_finding(
             'low', 'Social Media Guidance Error',
@@ -440,67 +417,54 @@ def _get_age_appropriate_social_media_guidance(family_members: List[Dict[str, An
             {'error': str(e)}
         ))
     
-    return findings
-
-def _get_platform_privacy_recommendations() -> List[Dict[str, Any]]:
-    """Get platform-specific privacy recommendations."""
-    findings = []
-    platforms = {
-        'Facebook': 'Review privacy settings, limit data sharing, and use two-factor authentication',
-        'Instagram': 'Set account to private, review story settings, and limit location sharing',
-        'TikTok': 'Set account to private, disable location services, and review data sharing settings',
-        'Snapchat': 'Enable Ghost Mode, review who can contact you, and limit location sharing',
-        'Twitter': 'Review privacy settings, limit data sharing, and protect your tweets',
-        'YouTube': 'Use Restricted Mode for children, review privacy settings, and manage watch history'
+    return {
+        'findings': findings,
+        'recommendations': recommendations,
+        'technical_details': {
+            'members_analyzed': len(family_members),
+            'age_groups': age_groups
+        }
     }
-    
-    for platform_name, recommendation in platforms.items():
-        findings.append(_create_finding(
-            'info', f'{platform_name} Privacy Settings',
-            f'Privacy recommendations for {platform_name}',
-            recommendation,
-            {'platform': platform_name}
-        ))
-    
-    return findings
 
-def _generate_parental_control_recommendations(findings: List[Dict[str, Any]], family_profile: Dict[str, Any]) -> List[str]:
-    """Generate actionable parental control recommendations."""
-    recommendations = [f['recommendation'] for f in findings if 'recommendation' in f]
-    
-    general_recs = [
-        'Establish clear family rules for internet and device usage',
-        'Use age-appropriate content filtering and monitoring tools',
-        'Regularly discuss online safety with all family members',
-        'Set up screen time limits and device-free zones',
-        'Review and update privacy settings on all social media platforms',
-        'Enable safe search on all search engines',
-        'Use family-safe DNS filtering services',
-        'Regularly review and update parental control software',
-        'Create separate user accounts for children with appropriate restrictions',
-        'Monitor and review online activity regularly but respectfully'
-    ]
-    
-    for rec in general_recs:
-        if all(rec.lower() not in r.lower() for r in recommendations):
-            recommendations.append(rec)
-    
-    return recommendations[:15]
+def _get_platform_privacy_recommendations() -> Dict[str, List[str]]:
+    """Get platform-specific privacy recommendations."""
+    return {
+        'Facebook': [
+            'Review privacy settings and limit data sharing',
+            'Use two-factor authentication'
+        ],
+        'Instagram': [
+            'Set account to private',
+            'Review story settings and limit location sharing'
+        ],
+        'TikTok': [
+            'Set account to private',
+            'Disable location services and review data sharing settings'
+        ],
+        'Snapchat': [
+            'Enable Ghost Mode in Snap Map',
+            'Review who can contact you and limit location sharing'
+        ],
+        'Twitter': [
+            'Protect your tweets',
+            'Review privacy settings and limit data sharing'
+        ],
+        'YouTube': [
+            'Turn on Restricted Mode',
+            'Manage watch history'
+        ],
+        'Discord': [
+            'Adjust privacy and safety settings',
+            'Review friend request settings'
+        ]
+    }
 
 def _determine_overall_status(findings: List[Dict[str, Any]]) -> str:
     """Determine overall parental control status."""
-    if not findings:
-        return 'secure'
-    
-    critical = sum(1 for f in findings if f.get('severity', '').lower() == 'critical')
-    high = sum(1 for f in findings if f.get('severity', '').lower() == 'high')
-    medium = sum(1 for f in findings if f.get('severity', '').lower() == 'medium')
-    
-    if critical > 0 or high >= 2:
+    severities = {f.get('severity', '').lower() for f in findings}
+    if 'critical' in severities or 'high' in severities:
         return 'critical'
-    if high > 0 or medium >= 3:
-        return 'warning'
-    if medium > 0:
+    if severities:
         return 'warning'
     return 'secure'
 

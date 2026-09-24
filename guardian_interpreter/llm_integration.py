@@ -45,9 +45,9 @@ class GuardianLLM:
         -------------------------
         Recommended models (family-friendly, moderate size):
         
-        - Phi-3-mini (Recommended for Guardian Node):
-          https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
-          Download: Phi-3-mini-4k-instruct-q4.gguf (~2.3GB)
+        - Phi-4-mini (Recommended for Guardian Node):
+          https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF
+          Download: microsoft_Phi-4-mini-instruct-Q4_K_M.gguf (~2.3GB)
         
         - Mistral-7B (For advanced security analysis):
           https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF
@@ -56,13 +56,13 @@ class GuardianLLM:
         STEP 3: Place Model File
         -------------------------
         Create models/ directory in project root and place downloaded .gguf file:
-          guardian-node/models/Phi-3-mini-4k-instruct-q4.gguf
+          guardian-node/models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf
         
         STEP 4: Configure (Optional)
         -----------------------------
         Update guardian_interpreter/config.yaml to customize:
         - model_path: Path to your model file
-        - context_length: Token context window (default: 4096)
+        - context_length: Token context window (default: 8192)
         - threads: CPU threads to use (default: 4)
         - temperature: Response creativity (0.0-1.0, default: 0.7)
         
@@ -80,7 +80,7 @@ class GuardianLLM:
         default_model_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'models',
-            'Phi-3-mini-4k-instruct-q4.gguf'
+            'microsoft_Phi-4-mini-instruct-Q4_K_M.gguf'
         )
         self.model_path = llm_config.get('model_path', default_model_path)
 
@@ -94,7 +94,7 @@ class GuardianLLM:
             self.logger.info(f"Loading LLM model: {self.model_path}")
             self.llm = Llama(
                 model_path=self.model_path,
-                n_ctx=llm_config.get('context_length', 4096),
+                n_ctx=llm_config.get('context_length', 8192),
                 n_threads=llm_config.get('threads', 4),
                 verbose=False
             )
@@ -153,7 +153,7 @@ class GuardianLLM:
         if self.is_loaded():
             llm_config = self.config.get('llm', {})
             info.update({
-                'context_length': llm_config.get('context_length', 4096),
+                'context_length': llm_config.get('context_length', 8192),
                 'temperature': llm_config.get('temperature', 0.7),
                 'max_tokens': llm_config.get('max_tokens', 512),
                 'threads': llm_config.get('threads', 4)

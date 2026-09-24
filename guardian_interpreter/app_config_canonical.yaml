@@ -6,9 +6,9 @@
 llm:
   models:
     default:
-      path: "models/gemma-2-2b-it-Q4_K_M.gguf"  # Path to your GGUF model file
-      model_type: "gemma"  # Model type: gemma, phi3, mistral, etc.
-      context_length: 4096
+      path: "models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"  # Path to your GGUF model file
+      model_type: "phi3"  # Model type: gemma, phi3, mistral, etc.
+      context_length: 8192
       temperature: 0.7
       max_tokens: 512
       threads: 4  # CPU threads for inference

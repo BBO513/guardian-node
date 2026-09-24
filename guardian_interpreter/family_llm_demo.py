@@ -24,7 +24,7 @@ def main():
             config = yaml.safe_load(f)
     except FileNotFoundError:
         print("Configuration file not found, using defaults...")
-        config = {'llm': {'model_path': 'models/your-model.gguf'}}
+        config = {'llm': {'model_path': 'models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf'}}
     
     # Create LLM instance
     llm = create_llm(config, logger)

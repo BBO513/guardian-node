@@ -168,7 +168,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_dns_filtering()
+        result = parental_control_protocol._check_dns_filtering(self.sample_family_profile)
         
         self.assertTrue(result['filtered_dns'])
         self.assertEqual(result['service'], 'OpenDNS Family Shield')
@@ -184,7 +184,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_dns_filtering()
+        result = parental_control_protocol._check_dns_filtering(self.sample_family_profile)
         
         self.assertTrue(result['filtered_dns'])
         self.assertEqual(result['service'], 'CleanBrowsing Family')
@@ -199,7 +199,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_dns_filtering()
+        result = parental_control_protocol._check_dns_filtering(self.sample_family_profile)
         
         self.assertFalse(result['filtered_dns'])
         self.assertIsNone(result['service'])
@@ -214,7 +214,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_parental_control_software()
+        result = parental_control_protocol._check_parental_control_software(self.sample_family_profile)
         
         self.assertTrue(result['detected'])
         self.assertIn('qustodio', result['software'])
@@ -230,7 +230,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_parental_control_software()
+        result = parental_control_protocol._check_parental_control_software(self.sample_family_profile)
         
         self.assertTrue(result['detected'])
         self.assertIn('qustodio', result['software'])
@@ -247,7 +247,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._detect_monitoring_software()
+        result = parental_control_protocol._detect_monitoring_software(self.sample_family_profile)
         
         self.assertIn('qustodio', result)
         self.assertIn('bark', result)
@@ -263,7 +263,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_builtin_parental_controls()
+        result = parental_control_protocol._check_builtin_parental_controls(self.sample_family_profile)
         
         self.assertTrue(result['enabled'])
         self.assertIn("Windows Family Safety", result['features'])
@@ -278,7 +278,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_builtin_parental_controls()
+        result = parental_control_protocol._check_builtin_parental_controls(self.sample_family_profile)
         
         self.assertTrue(result['enabled'])
         self.assertIn("macOS Screen Time", result['features'])
@@ -293,7 +293,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_screen_time_controls()
+        result = parental_control_protocol._check_screen_time_controls(self.sample_family_profile)
         
         self.assertTrue(result['enabled'])
         self.assertIn("macOS Screen Time", result['features'])
@@ -308,7 +308,7 @@ class TestParentalControlProtocol(unittest.TestCase):
             returncode=0
         )
         
-        result = parental_control_protocol._check_screen_time_controls()
+        result = parental_control_protocol._check_screen_time_controls(self.sample_family_profile)
         
         self.assertTrue(result['enabled'])
         self.assertIn("Windows Family Features", result['features'])
@@ -409,10 +409,10 @@ class TestParentalControlProtocol(unittest.TestCase):
             mock_subprocess.side_effect = subprocess.TimeoutExpired('test', 10)
             
             # Should not raise exception, should return safe defaults
-            result = parental_control_protocol._check_dns_filtering()
+            result = parental_control_protocol._check_dns_filtering(self.sample_family_profile)
             self.assertFalse(result['filtered_dns'])
             
-            result = parental_control_protocol._check_parental_control_software()
+            result = parental_control_protocol._check_parental_control_software(self.sample_family_profile)
             self.assertFalse(result['detected'])
 
 class TestParentalControlProtocolIntegration(unittest.TestCase):
@@ -437,7 +437,7 @@ class TestParentalControlProtocolIntegration(unittest.TestCase):
             mock_dns.return_value = {'filtered_dns': True, 'service': 'OpenDNS Family Shield', 'dns_server': '208.67.222.123'}
             mock_software.return_value = {'detected': True, 'software': ['qustodio']}
             
-            result = parental_control_protocol._analyze_content_filtering()
+            result = parental_control_protocol._analyze_content_filtering(self.sample_family_profile)
             
             self.assertIn('findings', result)
             self.assertIn('recommendations', result)
@@ -513,6 +513,17 @@ class TestParentalControlProtocolIntegration(unittest.TestCase):
 class TestParentalControlProtocolEdgeCases(unittest.TestCase):
     """Test edge cases and error conditions"""
     
+    def setUp(self):
+        """Set up test fixtures"""
+        self.sample_family_profile = {
+            'family_id': 'test_family',
+            'members': [
+                {'name': 'Child1', 'age_group': 'child'},
+                {'name': 'Teen1', 'age_group': 'teen'},
+                {'name': 'Parent1', 'age_group': 'adult'}
+            ]
+        }
+    
     def test_empty_family_profile(self):
         """Test analysis with empty family profile"""
         result = parental_control_protocol.analyze(family_profile={})
@@ -551,10 +562,10 @@ class TestParentalControlProtocolEdgeCases(unittest.TestCase):
             mock_subprocess.side_effect = subprocess.TimeoutExpired('cmd', 10)
             
             # All network-dependent checks should handle timeouts gracefully
-            dns_result = parental_control_protocol._check_dns_filtering()
+            dns_result = parental_control_protocol._check_dns_filtering(self.sample_family_profile)
             self.assertFalse(dns_result['filtered_dns'])
             
-            software_result = parental_control_protocol._check_parental_control_software()
+            software_result = parental_control_protocol._check_parental_control_software(self.sample_family_profile)
             self.assertFalse(software_result['detected'])
 
 if __name__ == '__main__':
