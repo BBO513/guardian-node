@@ -25,6 +25,9 @@ cryptography>=41.0.0
 
 # Local LLM inference
 llama-cpp-python>=0.2.72
+# Needle 3 command router (fast offline tool calling). Pinned: 3.0.5 asks for an engine
+# build (3.0.2) that is not published on Hugging Face yet.
+cactus-needle==3.0.4
 
 # NOTE: Model files are NOT installed via pip
 # See guardian_interpreter/llm_integration.py for model download instructions

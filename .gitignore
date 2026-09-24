@@ -107,3 +107,6 @@ secrets.yaml
 # Local backups (large, never commit)
 Found backup of guardian_node/
 guardian_node_v1/
+
+# Needle fine-tuning data (regenerate with scripts/needle_finetune/make_dataset.py)
+scripts/needle_finetune/*.jsonl
