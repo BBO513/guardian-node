@@ -49,6 +49,16 @@ def _play_wav(wav_path: str) -> bool:
         return True
     except Exception:
         pass
+    # Linux (Pi): play through PipeWire/PulseAudio, which resamples to whatever the device
+    # supports (USB headsets are often 48 kHz only; Piper voices are 22.05 kHz).
+    import shutil
+    import subprocess
+    for player in (["pw-play"], ["paplay"]):
+        if shutil.which(player[0]):
+            try:
+                return subprocess.run(player + [wav_path], timeout=120).returncode == 0
+            except Exception:
+                pass
     try:
         import numpy as np
         import sounddevice as sd
